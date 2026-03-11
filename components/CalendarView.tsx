@@ -1,0 +1,277 @@
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, User, CheckCircle2, AlertCircle, AlertTriangle, Send, Trash2, X, Building, Users } from 'lucide-react';
+import { CalendarTask, User as UserType, UrgencyLevel, AppTab, ExternalUser } from '../types';
+import { storageService } from '../services/storageService';
+import TaskForm from './TaskForm';
+
+interface CalendarViewProps {
+  user: UserType;
+  onNavigate: (tab: AppTab) => void;
+}
+
+const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [tasks, setTasks] = useState<CalendarTask[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<CalendarTask | undefined>(undefined);
+  const [taskToDelete, setTaskToDelete] = useState<CalendarTask | null>(null);
+
+  useEffect(() => {
+    setTasks(storageService.getTasks());
+  }, [showForm]);
+
+  const daysInMonth = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const date = new Date(year, month, 1);
+    const days = [];
+    const firstDay = date.getDay() === 0 ? 6 : date.getDay() - 1; 
+    
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+    
+    while (date.getMonth() === month) {
+      days.push(new Date(date));
+      date.setDate(date.getDate() + 1);
+    }
+    return days;
+  }, [currentDate]);
+
+  const changeMonth = (offset: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() + offset);
+    setCurrentDate(newDate);
+  };
+
+  const getPriorityColor = (priority: UrgencyLevel) => {
+    switch (priority) {
+      case 'Crítica': return 'bg-red-500';
+      case 'Alta': return 'bg-orange-500';
+      case 'Media': return 'bg-yellow-400';
+      case 'Baja': return 'bg-green-500';
+      case 'Rutina': return 'bg-blue-400';
+      default: return 'bg-gray-300';
+    }
+  };
+
+  const selectedTasks = useMemo(() => {
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    return tasks.filter(t => t.startDate === dateStr).sort((a,b) => (a.startTime || '').localeCompare(b.startTime || ''));
+  }, [tasks, selectedDate]);
+
+  const handleToggleTaskStatus = (task: CalendarTask) => {
+    const newStatus = task.status === 'Completada' ? 'Pendiente' : 'Completada';
+    storageService.saveTask({ ...task, status: newStatus });
+    setTasks(storageService.getTasks());
+  };
+
+  const handleDeleteTask = () => {
+    if (taskToDelete) {
+      storageService.deleteTask(taskToDelete.id);
+      setTasks(storageService.getTasks());
+      setTaskToDelete(null);
+    }
+  };
+
+  const handleSendToWhatsApp = (task: CalendarTask, external?: ExternalUser) => {
+    let phone = '';
+    let targetName = '';
+
+    if (external) {
+      phone = external.phone.replace(/\+/g, '');
+      targetName = external.name;
+    } else {
+      const assignedUsers = storageService.getUsers().filter(u => task.assignedTo.includes(u.id));
+      if (assignedUsers.length === 0) return alert("Asigna técnicos primero.");
+      phone = assignedUsers[0].phone?.replace(/\+/g, '') || '';
+      targetName = assignedUsers[0].name;
+    }
+
+    const msg = `🔔 *ORDEN DE TRABAJO SIGAI USAC*\n━━━━━━━━━━━━━━\n👤 *Para:* ${targetName}\n📋 *Tarea:* ${task.title}\n📅 *Fecha:* ${task.startDate}\n⏰ *Hora:* ${task.startTime || 'S/N'}\n🏢 *Ubicación:* ${task.location || 'N/A'}\n⚡ *Prioridad:* ${task.priority}\n📝 *Descripción:* ${task.description}\n━━━━━━━━━━━━━━\n👨‍✈️ *Asignado por:* ${user.name}\n_Favor confirmar recepción respondiendo "OK"_`;
+    
+    window.open(`https://wa.me/${phone.startsWith('34') ? phone : '34'+phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  return (
+    <div className="w-full max-w-sm mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
+      {/* Header Calendario */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg">
+            <CalendarIcon className="w-6 h-6 text-yellow-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-black uppercase text-gray-900 tracking-tighter leading-none">Mi Agenda</h2>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+              {currentDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => changeMonth(-1)} className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm active:scale-90"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={() => changeMonth(1)} className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm active:scale-90"><ChevronRight className="w-4 h-4" /></button>
+        </div>
+      </div>
+
+      {/* Grid del Mes */}
+      <div className="bg-white rounded-[2.5rem] p-6 border border-gray-100 shadow-sm">
+        <div className="grid grid-cols-7 gap-1 mb-4">
+          {['L','M','X','J','V','S','D'].map(d => (
+            <div key={d} className="text-center text-[9px] font-black text-gray-300 uppercase py-2">{d}</div>
+          ))}
+          {daysInMonth.map((day, idx) => {
+            if (!day) return <div key={`empty-${idx}`} className="h-12" />;
+            const dateStr = day.toISOString().split('T')[0];
+            const dayTasks = tasks.filter(t => t.startDate === dateStr);
+            const isSelected = selectedDate.toDateString() === day.toDateString();
+            const isToday = new Date().toDateString() === day.toDateString();
+            return (
+              <button 
+                key={dateStr}
+                onClick={() => setSelectedDate(new Date(day))}
+                className={`relative h-12 flex flex-col items-center justify-center rounded-xl transition-all active:scale-90 ${isSelected ? 'bg-gray-900 text-white shadow-xl scale-110 z-10' : isToday ? 'bg-yellow-50 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-gray-900'}`}>{day.getDate()}</span>
+                {dayTasks.length > 0 && (
+                  <div className="flex gap-0.5 mt-1">
+                    {dayTasks.slice(0, 3).map((t, i) => (
+                      <div key={i} className={`w-1 h-1 rounded-full ${getPriorityColor(t.priority)}`} />
+                    ))}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Agenda Diaria */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-2">
+           <h3 className="text-sm font-black uppercase text-gray-900 tracking-widest flex items-center gap-2">
+             <Clock className="w-4 h-4 text-yellow-500" />
+             Tareas del {selectedDate.getDate()} de {selectedDate.toLocaleString('es-ES', { month: 'short' })}
+           </h3>
+           <button 
+            onClick={() => { setEditingTask(undefined); setShowForm(true); }}
+            className="p-3 bg-yellow-400 text-black rounded-xl shadow-lg active:scale-95 flex items-center gap-2 text-[9px] font-black uppercase"
+           >
+             <Plus className="w-4 h-4" /> Nueva
+           </button>
+        </div>
+
+        <div className="space-y-3">
+          {selectedTasks.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-[2rem] border-2 border-dashed border-gray-100 flex flex-col items-center gap-3">
+              <CalendarIcon className="w-10 h-10 text-gray-200" />
+              <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Sin trabajos programados</p>
+            </div>
+          ) : (
+            selectedTasks.map(task => (
+              <div 
+                key={task.id} 
+                className={`bg-white rounded-[2rem] p-5 shadow-sm border transition-all ${task.status === 'Completada' ? 'border-green-100 opacity-60' : 'border-gray-100'}`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${getPriorityColor(task.priority)}`}>
+                      {task.priority === 'Crítica' ? <AlertTriangle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-[11px] uppercase text-gray-900 leading-none">{task.title}</h4>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">{task.type} · {task.startTime || 'Todo el día'}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => handleToggleTaskStatus(task)}
+                    className={`p-2 rounded-lg transition-colors ${task.status === 'Completada' ? 'text-green-500 bg-green-50' : 'text-gray-200 hover:text-green-500'}`}
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Asignaciones Resumen */}
+                <div className="flex flex-wrap gap-1 mb-4">
+                   {task.assignedTo.length > 0 && (
+                     <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[7px] font-black uppercase flex items-center gap-1 border border-blue-100">
+                        <Users className="w-2 h-2" /> {task.assignedTo.length} Técnicos USAC
+                     </div>
+                   )}
+                   {task.externalAssignments?.map(ext => (
+                     <div key={ext.id} className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full text-[7px] font-black uppercase flex items-center gap-1 border border-amber-100">
+                        <Building className="w-2 h-2" /> {ext.name.substring(0,10)}..
+                     </div>
+                   ))}
+                </div>
+
+                <div className="flex items-center justify-between border-t border-gray-50 pt-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 text-gray-400">
+                      <MapPin className="w-3 h-3" />
+                      <span className="text-[8px] font-black uppercase">{task.location || 'S/N'}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Botón WhatsApp General / Primer Externo */}
+                    <button 
+                      onClick={() => handleSendToWhatsApp(task, task.externalAssignments?.[0])}
+                      className="p-2 text-green-500 hover:bg-green-50 rounded-lg transition-all active:scale-90"
+                      title="Enviar Orden por WhatsApp"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => { setEditingTask(task); setShowForm(true); }}
+                      className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all active:scale-90"
+                    >
+                      <Plus className="w-4 h-4 rotate-45" />
+                    </button>
+                    <button 
+                      onClick={() => setTaskToDelete(task)}
+                      className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all active:scale-90"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Modal Confirmación Borrado */}
+      {taskToDelete && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+           <div className="w-full max-w-xs bg-white rounded-[2.5rem] p-8 text-center shadow-2xl animate-in zoom-in-95 duration-300">
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                 <AlertTriangle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-tight text-gray-900 mb-2">¿Eliminar Tarea?</h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed mb-8 tracking-widest px-2">
+                Esta acción es irreversible y afectará a los técnicos y contratistas asignados.
+              </p>
+              <div className="space-y-3">
+                 <button onClick={handleDeleteTask} className="w-full p-5 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">Eliminar permanentemente</button>
+                 <button onClick={() => setTaskToDelete(null)} className="w-full p-4 text-gray-400 font-black uppercase text-[10px] tracking-widest">Cancelar</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {showForm && (
+        <TaskForm 
+          user={user} 
+          initialDate={selectedDate.toISOString().split('T')[0]}
+          task={editingTask}
+          onClose={() => { setShowForm(false); setEditingTask(undefined); }} 
+        />
+      )}
+    </div>
+  );
+};
+
+export default CalendarView;
