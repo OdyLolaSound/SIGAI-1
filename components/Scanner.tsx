@@ -204,7 +204,9 @@ const Scanner: React.FC<ScannerProps> = ({ serviceType, building, user, onComple
       <div className="space-y-4 px-2">
         <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${!v1Status.valid ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100 shadow-sm'}`}>
           <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">
-            {serviceType === 'luz' ? 'Contador A (kWh)' : serviceType === 'agua' ? 'Caudalímetro (m³)' : 'Consumo (Horas)'}
+            {serviceType === 'luz' 
+              ? (building.id === 'CT_1_2' ? 'Contador CT 1 (kWh)' : building.id === 'CT_3' ? 'Contador CT 3 (kWh)' : 'Contador A (kWh)') 
+              : serviceType === 'agua' ? 'Caudalímetro (m³)' : 'Consumo (Horas)'}
           </label>
           <div className="flex items-center gap-4 mb-4">
              <div className="flex-1 text-center opacity-30">
@@ -219,9 +221,11 @@ const Scanner: React.FC<ScannerProps> = ({ serviceType, building, user, onComple
           <input type="text" inputMode="decimal" value={val1} onChange={e => setVal1(e.target.value)} className="w-full p-6 bg-gray-50 rounded-3xl text-4xl font-mono text-center outline-none border-2 border-transparent focus:border-yellow-400 transition-all font-black text-gray-900" placeholder="00000.0" />
         </div>
 
-        {serviceType === 'luz' && (
+        {serviceType === 'luz' && (building.id !== 'CT_3') && (
           <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${!v2Status.valid ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100 shadow-sm'}`}>
-            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">Contador B (kWh)</label>
+            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">
+              {building.id === 'CT_1_2' ? 'Contador CT 2 (kWh)' : 'Contador B (kWh)'}
+            </label>
             <div className="flex items-center gap-4 mb-4">
                <div className="flex-1 text-center opacity-30"><div className="text-[8px] font-black uppercase mb-1">Anterior</div><div className="font-mono text-sm font-bold">{lastReading?.value2 || '0'}</div></div>
                <div className="flex-1 text-center"><div className="text-[8px] font-black uppercase text-blue-500 mb-1">Delta</div><div className="font-mono text-sm font-bold text-blue-500">+{v2Status.diff.toFixed(1)}</div></div>

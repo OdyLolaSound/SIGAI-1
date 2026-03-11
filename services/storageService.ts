@@ -26,6 +26,77 @@ const BOILER_MAINTENANCE_KEY = 'sigai_boiler_maintenance_v1';
 const PROVIDERS_KEY = 'sigai_providers_v1';
 const CATEGORIES_KEY = 'sigai_categories_v1';
 
+// --- SERVER SYNC HELPERS ---
+const API_BASE = '/api';
+
+async function fetchFromServer() {
+  try {
+    const res = await fetch(`${API_BASE}/data`);
+    if (res.ok) {
+      const data = await res.json();
+      // Sync to localStorage
+      if (data.readings) localStorage.setItem(READINGS_KEY, JSON.stringify(data.readings));
+      if (data.users) localStorage.setItem(USERS_KEY, JSON.stringify(data.users));
+      if (data.requests) localStorage.setItem(REQUESTS_KEY, JSON.stringify(data.requests));
+      if (data.gasoil_tanks) localStorage.setItem(GASOIL_TANKS_KEY, JSON.stringify(data.gasoil_tanks));
+      if (data.gasoil_readings) localStorage.setItem(GASOIL_READINGS_KEY, JSON.stringify(data.gasoil_readings));
+      if (data.refuel_requests) localStorage.setItem(REFUEL_REQUESTS_KEY, JSON.stringify(data.refuel_requests));
+      if (data.salt_stock) localStorage.setItem(SALT_STOCK_KEY, JSON.stringify(data.salt_stock));
+      if (data.salt_softeners) localStorage.setItem(SALT_SOFTENERS_KEY, JSON.stringify(data.salt_softeners));
+      if (data.salt_refill_logs) localStorage.setItem(SALT_REFILL_LOGS_KEY, JSON.stringify(data.salt_refill_logs));
+      if (data.salt_entry_logs) localStorage.setItem(SALT_ENTRY_LOGS_KEY, JSON.stringify(data.salt_entry_logs));
+      if (data.water_accounts) localStorage.setItem(WATER_ACCOUNTS_KEY, JSON.stringify(data.water_accounts));
+      if (data.water_sync_logs) localStorage.setItem(WATER_SYNC_LOGS_KEY, JSON.stringify(data.water_sync_logs));
+      if (data.tasks) localStorage.setItem(TASKS_KEY, JSON.stringify(data.tasks));
+      if (data.notifications) localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(data.notifications));
+      if (data.external_contacts) localStorage.setItem(EXTERNAL_CONTACTS_KEY, JSON.stringify(data.external_contacts));
+      if (data.boilers) localStorage.setItem(BOILERS_KEY, JSON.stringify(data.boilers));
+      if (data.boiler_readings) localStorage.setItem(BOILER_READINGS_KEY, JSON.stringify(data.boiler_readings));
+      if (data.boiler_maintenance) localStorage.setItem(BOILER_MAINTENANCE_KEY, JSON.stringify(data.boiler_maintenance));
+      if (data.providers) localStorage.setItem(PROVIDERS_KEY, JSON.stringify(data.providers));
+      if (data.categories) localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data.categories));
+      return true;
+    }
+  } catch (e) {
+    console.error("Sync error:", e);
+  }
+  return false;
+}
+
+async function saveToServer() {
+  try {
+    const data = {
+      readings: JSON.parse(localStorage.getItem(READINGS_KEY) || '[]'),
+      users: JSON.parse(localStorage.getItem(USERS_KEY) || '[]'),
+      requests: JSON.parse(localStorage.getItem(REQUESTS_KEY) || '[]'),
+      gasoil_tanks: JSON.parse(localStorage.getItem(GASOIL_TANKS_KEY) || '[]'),
+      gasoil_readings: JSON.parse(localStorage.getItem(GASOIL_READINGS_KEY) || '[]'),
+      refuel_requests: JSON.parse(localStorage.getItem(REFUEL_REQUESTS_KEY) || '[]'),
+      salt_stock: JSON.parse(localStorage.getItem(SALT_STOCK_KEY) || 'null'),
+      salt_softeners: JSON.parse(localStorage.getItem(SALT_SOFTENERS_KEY) || '[]'),
+      salt_refill_logs: JSON.parse(localStorage.getItem(SALT_REFILL_LOGS_KEY) || '[]'),
+      salt_entry_logs: JSON.parse(localStorage.getItem(SALT_ENTRY_LOGS_KEY) || '[]'),
+      water_accounts: JSON.parse(localStorage.getItem(WATER_ACCOUNTS_KEY) || '[]'),
+      water_sync_logs: JSON.parse(localStorage.getItem(WATER_SYNC_LOGS_KEY) || '[]'),
+      tasks: JSON.parse(localStorage.getItem(TASKS_KEY) || '[]'),
+      notifications: JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY) || '[]'),
+      external_contacts: JSON.parse(localStorage.getItem(EXTERNAL_CONTACTS_KEY) || '[]'),
+      boilers: JSON.parse(localStorage.getItem(BOILERS_KEY) || '[]'),
+      boiler_readings: JSON.parse(localStorage.getItem(BOILER_READINGS_KEY) || '[]'),
+      boiler_maintenance: JSON.parse(localStorage.getItem(BOILER_MAINTENANCE_KEY) || '[]'),
+      providers: JSON.parse(localStorage.getItem(PROVIDERS_KEY) || '[]'),
+      categories: JSON.parse(localStorage.getItem(CATEGORIES_KEY) || '[]'),
+    };
+    await fetch(`${API_BASE}/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch (e) {
+    console.error("Save error:", e);
+  }
+}
+
 export const BUILDINGS: Building[] = [
   { id: 'E0007', name: 'Vestuario de Mandos', code: 'E0007', unit: 'USAC', hasBoiler: true },
   { id: 'E0010', name: 'Vestuario GCG y GOE III', code: 'E0010', unit: 'GCG', hasBoiler: true },
@@ -35,6 +106,8 @@ export const BUILDINGS: Building[] = [
   { id: 'E0064', name: 'Alojamiento Logístico de Mandos 3', code: 'E0064', unit: 'USAC', hasBoiler: true },
   { id: 'E0065', name: 'Estado Mayor MOE', code: 'E0065', unit: 'USAC', hasBoiler: true },
   { id: 'E0068', name: 'Alojamiento Tropa A', code: 'E0068', unit: 'USAC', hasBoiler: true },
+  { id: 'CT_1_2', name: 'Centro de transformación 1 y 2', code: 'CT12', unit: 'USAC', hasBoiler: false },
+  { id: 'CT_3', name: 'Centro de transformación 3', code: 'CT3', unit: 'USAC', hasBoiler: false },
 ];
 
 /**
@@ -49,6 +122,11 @@ export const PIEZAS_COMUNES: BoilerPart[] = [
 ];
 
 export const storageService = {
+  // --- SYNC ---
+  init: async () => {
+    return await fetchFromServer();
+  },
+
   // --- WATER TELEMETRY (CUENTA ÚNICA) ---
   getWaterAccount: (): WaterAccount => {
     const data = localStorage.getItem(WATER_ACCOUNTS_KEY);
@@ -80,6 +158,7 @@ export const storageService = {
 
   saveWaterAccount: (account: WaterAccount) => {
     localStorage.setItem(WATER_ACCOUNTS_KEY, JSON.stringify([account]));
+    saveToServer();
   },
 
   getWaterSyncLogs: (): WaterSyncLog[] => {
@@ -195,43 +274,75 @@ export const storageService = {
   // --- USERS ---
   getUsers: (): User[] => {
     const data = localStorage.getItem(USERS_KEY);
+    const initial: User[] = [
+      { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] },
+      { id: 'tech-1', name: 'Técnico USAC', username: 'user@picks.pro', password: '123', role: 'USAC', status: 'approved', assignedBuildings: BUILDINGS.map(b => b.id), assignedUnits: ['USAC'], phone: '34600000000', specialty: 'Electricidad' },
+      { id: 'unit-1', name: 'Técnico GOE III', username: 'unit@picks.pro', password: '123', role: 'GOE3', status: 'approved', assignedBuildings: BUILDINGS.filter(b => b.unit === 'GOE3').map(b => b.id), assignedUnits: ['GOE3'], phone: '34611111111', specialty: 'Fontanería' }
+    ];
+
     if (!data) {
-      const initial: User[] = [
-        { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [] },
-        { id: 'tech-1', name: 'Técnico USAC', username: 'user@picks.pro', password: '123', role: 'USAC', status: 'approved', assignedBuildings: BUILDINGS.map(b => b.id), phone: '34600000000', specialty: 'Electricidad' },
-        { id: 'unit-1', name: 'Técnico GOE III', username: 'unit@picks.pro', password: '123', role: 'GOE3', status: 'approved', assignedBuildings: BUILDINGS.filter(b => b.unit === 'GOE3').map(b => b.id), phone: '34611111111', specialty: 'Fontanería' }
-      ];
       localStorage.setItem(USERS_KEY, JSON.stringify(initial));
       return initial;
     }
-    return JSON.parse(data);
+    try {
+      const users: User[] = JSON.parse(data);
+      if (users.length === 0) {
+        localStorage.setItem(USERS_KEY, JSON.stringify(initial));
+        return initial;
+      }
+      // Ensure master exists in the list
+      if (!users.find(u => u.role === 'MASTER')) {
+        const updated = [initial[0], ...users];
+        localStorage.setItem(USERS_KEY, JSON.stringify(updated));
+        return updated;
+      }
+      return users;
+    } catch (e) {
+      return initial;
+    }
   },
 
   saveUser: (user: User) => {
     const users = storageService.getUsers();
-    localStorage.setItem(USERS_KEY, JSON.stringify([...users, user]));
+    const updated = [...users, user];
+    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
-  updateUserStatus: (userId: string, status: UserStatus, assignedBuildings: string[]) => {
+  updateUserStatus: (userId: string, status: UserStatus, assignedBuildings: string[], assignedUnits: Role[]) => {
     const users = storageService.getUsers();
-    const updated = users.map(u => u.id === userId ? { ...u, status, assignedBuildings } : u);
+    const updated = users.map(u => u.id === userId ? { ...u, status, assignedBuildings, assignedUnits } : u);
     localStorage.setItem(USERS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   resetUserPassword: (userId: string, newPass: string) => {
     const users = storageService.getUsers();
     const updated = users.map(u => u.id === userId ? { ...u, password: newPass } : u);
     localStorage.setItem(USERS_KEY, JSON.stringify(updated));
+    saveToServer();
+  },
+
+  updateUserLeaveDays: (userId: string, leaveDays: string[]) => {
+    const users = storageService.getUsers();
+    const updated = users.map(u => u.id === userId ? { ...u, leaveDays } : u);
+    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   // --- READINGS ---
   getReadings: (buildingId?: string, service?: ServiceType): Reading[] => {
     const data = localStorage.getItem(READINGS_KEY);
     if (!data) return [];
-    let readings: Reading[] = JSON.parse(data);
-    if (buildingId) readings = readings.filter(r => r.buildingId === buildingId);
-    if (service) readings = readings.filter(r => r.serviceType === service);
-    return readings;
+    try {
+      let readings: Reading[] = JSON.parse(data);
+      if (buildingId) readings = readings.filter(r => r.buildingId === buildingId);
+      if (service) readings = readings.filter(r => r.serviceType === service);
+      return readings;
+    } catch (e) {
+      console.error("Error parsing readings", e);
+      return [];
+    }
   },
 
   saveReading: (reading: Reading) => {
@@ -248,13 +359,16 @@ export const storageService = {
         reading.consumption2 = 0;
       }
     }
-    localStorage.setItem(READINGS_KEY, JSON.stringify([...readings, reading]));
+    const updated = [...readings, reading];
+    localStorage.setItem(READINGS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   deleteReading: (id: string) => {
     const readings = storageService.getReadings();
     const filtered = readings.filter(r => r.id !== id);
     localStorage.setItem(READINGS_KEY, JSON.stringify(filtered));
+    saveToServer();
   },
 
   // --- REQUESTS ---
@@ -265,7 +379,9 @@ export const storageService = {
 
   saveRequest: (request: RequestItem) => {
     const requests = storageService.getRequests();
-    localStorage.setItem(REQUESTS_KEY, JSON.stringify([request, ...requests]));
+    const updated = [request, ...requests];
+    localStorage.setItem(REQUESTS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   updateRequestStatus: (id: string, status: RequestItem['status'], structuralSolution?: string, workDetails?: RequestItem['workDetails']) => {
@@ -278,6 +394,7 @@ export const storageService = {
       workDetails: workDetails || r.workDetails
     } : r);
     localStorage.setItem(REQUESTS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   // --- TASKS ---
@@ -289,17 +406,22 @@ export const storageService = {
   saveTask: (task: CalendarTask) => {
     const tasks = storageService.getTasks();
     const index = tasks.findIndex(t => t.id === task.id);
+    let updated;
     if (index > -1) {
       tasks[index] = task;
-      localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+      updated = [...tasks];
     } else {
-      localStorage.setItem(TASKS_KEY, JSON.stringify([task, ...tasks]));
+      updated = [task, ...tasks];
     }
+    localStorage.setItem(TASKS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   deleteTask: (id: string) => {
     const tasks = storageService.getTasks();
-    localStorage.setItem(TASKS_KEY, JSON.stringify(tasks.filter(t => t.id !== id)));
+    const filtered = tasks.filter(t => t.id !== id);
+    localStorage.setItem(TASKS_KEY, JSON.stringify(filtered));
+    saveToServer();
   },
 
   // --- NOTIFICATIONS ---
@@ -312,7 +434,9 @@ export const storageService = {
   addNotification: (notification: AppNotification) => {
     const data = localStorage.getItem(NOTIFICATIONS_KEY);
     const all: AppNotification[] = data ? JSON.parse(data) : [];
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify([notification, ...all]));
+    const updated = [notification, ...all];
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   markNotificationAsRead: (id: string) => {
@@ -321,13 +445,16 @@ export const storageService = {
     const all: AppNotification[] = JSON.parse(data);
     const updated = all.map(n => n.id === id ? { ...n, read: true } : n);
     localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   clearNotifications: (userId: string) => {
     const data = localStorage.getItem(NOTIFICATIONS_KEY);
     if (!data) return;
     const all: AppNotification[] = JSON.parse(data);
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all.filter(n => n.userId !== userId)));
+    const updated = all.filter(n => n.userId !== userId);
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   // --- GASOIL ---
@@ -354,11 +481,13 @@ export const storageService = {
 
   saveGasoilReading: (reading: GasoilReading) => {
     const readings = JSON.parse(localStorage.getItem(GASOIL_READINGS_KEY) || '[]');
-    localStorage.setItem(GASOIL_READINGS_KEY, JSON.stringify([reading, ...readings]));
+    const updatedReadings = [reading, ...readings];
+    localStorage.setItem(GASOIL_READINGS_KEY, JSON.stringify(updatedReadings));
+    saveToServer();
 
     // Update Tank
     const tanks = storageService.getGasoilTanks();
-    const updated = tanks.map(t => {
+    const updatedTanks = tanks.map(t => {
       if (t.id === reading.tankId) {
         let status: GasoilAlertStatus = 'normal';
         if (reading.percentage <= 10) status = 'critico';
@@ -375,12 +504,15 @@ export const storageService = {
       }
       return t;
     });
-    localStorage.setItem(GASOIL_TANKS_KEY, JSON.stringify(updated));
+    localStorage.setItem(GASOIL_TANKS_KEY, JSON.stringify(updatedTanks));
+    saveToServer();
   },
 
   saveRefuelRequest: (request: RefuelRequest) => {
     const requests = JSON.parse(localStorage.getItem(REFUEL_REQUESTS_KEY) || '[]');
-    localStorage.setItem(REFUEL_REQUESTS_KEY, JSON.stringify([request, ...requests]));
+    const updated = [request, ...requests];
+    localStorage.setItem(REFUEL_REQUESTS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   // --- SALT ---
@@ -420,29 +552,36 @@ export const storageService = {
     };
 
     const logs = storageService.getSaltRefillLogs();
-    localStorage.setItem(SALT_REFILL_LOGS_KEY, JSON.stringify([newLog, ...logs]));
+    const updatedLogs = [newLog, ...logs];
+    localStorage.setItem(SALT_REFILL_LOGS_KEY, JSON.stringify(updatedLogs));
+    saveToServer();
 
     warehouse.sacksAvailable = stockAfter;
     if (stockAfter <= warehouse.criticalAlertLevel) warehouse.status = 'critico';
     else if (stockAfter <= warehouse.minAlertLevel) warehouse.status = 'bajo';
     else warehouse.status = 'normal';
     localStorage.setItem(SALT_STOCK_KEY, JSON.stringify(warehouse));
+    saveToServer();
 
     const softeners = storageService.getSaltSofteners();
     const updatedSoft = softeners.map(s => s.id === logData.softenerId ? { ...s, lastRefillDate: logData.date, lastRefillSacks: logData.sacksUsed } : s);
     localStorage.setItem(SALT_SOFTENERS_KEY, JSON.stringify(updatedSoft));
+    saveToServer();
   },
 
   saveSaltEntry: (log: Omit<SaltEntryLog, 'id'>) => {
     const newLog: SaltEntryLog = { ...log, id: crypto.randomUUID() };
     const logs = JSON.parse(localStorage.getItem(SALT_ENTRY_LOGS_KEY) || '[]');
-    localStorage.setItem(SALT_ENTRY_LOGS_KEY, JSON.stringify([newLog, ...logs]));
+    const updatedLogs = [newLog, ...logs];
+    localStorage.setItem(SALT_ENTRY_LOGS_KEY, JSON.stringify(updatedLogs));
+    saveToServer();
 
     const warehouse = storageService.getSaltWarehouse();
     warehouse.sacksAvailable += log.sacksReceived;
     warehouse.lastSupplier = log.supplier;
     if (warehouse.sacksAvailable > warehouse.minAlertLevel) warehouse.status = 'normal';
     localStorage.setItem(SALT_STOCK_KEY, JSON.stringify(warehouse));
+    saveToServer();
   },
 
   // --- BOILERS ---
@@ -474,6 +613,7 @@ export const storageService = {
     const boilers = storageService.getBoilers();
     const updated = boilers.map(b => b.id === id ? { ...b, status } : b);
     localStorage.setItem(BOILERS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   getBoilerReadings: (boilerId?: string): BoilerTemperatureReading[] => {
@@ -485,7 +625,9 @@ export const storageService = {
 
   saveBoilerReading: (reading: BoilerTemperatureReading) => {
     const readings = storageService.getBoilerReadings();
-    localStorage.setItem(BOILER_READINGS_KEY, JSON.stringify([reading, ...readings]));
+    const updated = [reading, ...readings];
+    localStorage.setItem(BOILER_READINGS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   getBoilerMaintenance: (boilerId?: string): BoilerMaintenanceRecord[] => {
@@ -497,14 +639,18 @@ export const storageService = {
 
   saveBoilerMaintenance: (record: BoilerMaintenanceRecord) => {
     const records = storageService.getBoilerMaintenance();
-    localStorage.setItem(BOILER_MAINTENANCE_KEY, JSON.stringify([record, ...records]));
+    const updated = [record, ...records];
+    localStorage.setItem(BOILER_MAINTENANCE_KEY, JSON.stringify(updated));
+    saveToServer();
     storageService.updateBoilerStatus(record.boilerId, record.statusAfter);
   },
 
   saveExternalContact: (contact: ExternalUser) => {
     const data = localStorage.getItem(EXTERNAL_CONTACTS_KEY);
     const all: ExternalUser[] = data ? JSON.parse(data) : [];
-    localStorage.setItem(EXTERNAL_CONTACTS_KEY, JSON.stringify([contact, ...all]));
+    const updated = [contact, ...all];
+    localStorage.setItem(EXTERNAL_CONTACTS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   getExternalContacts: (): ExternalUser[] => {
@@ -680,13 +826,16 @@ export const storageService = {
 
   saveProvider: (provider: Provider) => {
     const providers = storageService.getProviders();
-    localStorage.setItem(PROVIDERS_KEY, JSON.stringify([provider, ...providers]));
+    const updated = [provider, ...providers];
+    localStorage.setItem(PROVIDERS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   updateProvider: (provider: Provider) => {
     const providers = storageService.getProviders();
     const updated = providers.map(p => p.id === provider.id ? provider : p);
     localStorage.setItem(PROVIDERS_KEY, JSON.stringify(updated));
+    saveToServer();
   },
 
   findProvider: (query: { name?: string, email?: string, phone?: string, cif?: string }): Provider | null => {

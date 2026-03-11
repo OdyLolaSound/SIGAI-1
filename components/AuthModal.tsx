@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShieldCheck, User as UserIcon, Lock, ChevronLeft, ChevronRight, UserPlus, AlertCircle, Crown, Zap, UserCheck } from 'lucide-react';
+import { ShieldCheck, User as UserIcon, Lock, ChevronLeft, ChevronRight, UserPlus, AlertCircle, Crown } from 'lucide-react';
 import { Role, User } from '../types';
 import { storageService } from '../services/storageService';
 
@@ -16,7 +16,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
     name: '',
     username: '',
     password: '',
-    role: initialRole
+    role: initialRole,
+    isManto: false
   });
   const [error, setError] = useState('');
 
@@ -45,27 +46,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
     onLogin(user);
   };
 
-  const handleQuickAdminLogin = () => {
-    const users = storageService.getUsers();
-    const master = users.find(u => u.role === 'MASTER');
-    if (master) onLogin(master);
-    else setError('Error crítico: Usuario maestro no inicializado');
-  };
-
-  const handleQuickUserLogin = () => {
-    const users = storageService.getUsers();
-    const techUser = users.find(u => u.username === 'user@picks.pro');
-    if (techUser) onLogin(techUser);
-    else setError('Error crítico: Usuario técnico no inicializado');
-  };
-
-  const handleQuickUnitLogin = () => {
-    const users = storageService.getUsers();
-    const unitUser = users.find(u => u.username === 'unit@picks.pro');
-    if (unitUser) onLogin(unitUser);
-    else setError('Error crítico: Usuario de unidad no inicializado');
-  };
-
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.username || !formData.password) {
@@ -86,7 +66,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
       password: formData.password,
       role: formData.role,
       status: 'pending',
-      assignedBuildings: []
+      assignedBuildings: [],
+      assignedUnits: [],
+      isManto: formData.isManto,
+      leaveDays: []
     };
 
     storageService.saveUser(newUser);
@@ -174,35 +157,29 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
               />
             </div>
 
+            {view === 'register' && (
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-yellow-400 rounded-lg">
+                    <Crown className="w-4 h-4 text-black" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase">Técnico Manto</p>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase">Personal de Mantenimiento USAC</p>
+                  </div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  className="w-5 h-5 rounded-lg border-gray-300 text-gray-900 focus:ring-gray-900"
+                  checked={formData.isManto}
+                  onChange={e => setFormData({...formData, isManto: e.target.checked})}
+                />
+              </div>
+            )}
+
             <button type="submit" className="w-full p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 mt-4 hover:bg-black">
               {view === 'login' ? 'Entrar' : 'Registrarse'} <ChevronRight className="w-4 h-4 text-yellow-400" />
             </button>
-
-            {view === 'login' && (
-              <div className="space-y-2 mt-4">
-                <button 
-                  type="button" 
-                  onClick={handleQuickAdminLogin}
-                  className="w-full p-4 bg-yellow-400/10 text-yellow-600 border-2 border-dashed border-yellow-400 rounded-2xl font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-black transition-all group"
-                >
-                  <Zap className="w-4 h-4 group-hover:fill-current" /> Admin (Master)
-                </button>
-                <button 
-                  type="button" 
-                  onClick={handleQuickUserLogin}
-                  className="w-full p-4 bg-blue-400/10 text-blue-600 border-2 border-dashed border-blue-400 rounded-2xl font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-2 hover:bg-blue-400 hover:text-white transition-all group"
-                >
-                  <ShieldCheck className="w-4 h-4 group-hover:fill-current" /> Técnico USAC
-                </button>
-                <button 
-                  type="button" 
-                  onClick={handleQuickUnitLogin}
-                  className="w-full p-4 bg-purple-400/10 text-purple-600 border-2 border-dashed border-purple-400 rounded-2xl font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-2 hover:bg-purple-400 hover:text-white transition-all group"
-                >
-                  <UserCheck className="w-4 h-4 group-hover:fill-current" /> Técnico Unidad (GOE III)
-                </button>
-              </div>
-            )}
           </form>
         </div>
 

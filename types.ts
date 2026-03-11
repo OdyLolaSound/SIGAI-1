@@ -14,10 +14,13 @@ export interface User {
   role: Role;
   status: UserStatus;
   assignedBuildings: string[];
+  assignedUnits: Role[];
   phone?: string;
   specialty?: string;
   avatar?: string;
   workload?: number;
+  isManto?: boolean;
+  leaveDays?: string[]; // ISO dates YYYY-MM-DD
 }
 
 // --- WATER TELEMETRY TYPES (AGUAS DE ALICANTE) ---

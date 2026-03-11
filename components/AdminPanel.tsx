@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { UserCheck, ShieldCheck, Building2, UserX, Check, Lock, RefreshCcw, Crown } from 'lucide-react';
+import { UserCheck, ShieldCheck, Building2, UserX, Check, Lock, RefreshCcw, Crown, CheckCircle2 } from 'lucide-react';
 import { User, Building, Role } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
 
@@ -11,17 +11,19 @@ interface AdminPanelProps {
 const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
   const [users, setUsers] = useState<User[]>(storageService.getUsers());
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [tempAssignments, setTempAssignments] = useState<string[]>([]);
+  const [tempBuildings, setTempBuildings] = useState<string[]>([]);
+  const [tempUnits, setTempUnits] = useState<Role[]>([]);
   const isMaster = currentUser.role === 'MASTER';
 
   const handleApprove = (userId: string) => {
     setEditingUserId(userId);
     const user = users.find(u => u.id === userId);
-    setTempAssignments(user?.assignedBuildings || []);
+    setTempBuildings(user?.assignedBuildings || []);
+    setTempUnits(user?.assignedUnits || []);
   };
 
   const saveApproval = (userId: string) => {
-    storageService.updateUserStatus(userId, 'approved', tempAssignments);
+    storageService.updateUserStatus(userId, 'approved', tempBuildings, tempUnits);
     setUsers(storageService.getUsers());
     setEditingUserId(null);
   };
@@ -36,16 +38,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
 
   const handleReject = (userId: string) => {
     if (confirm('¿Rechazar este registro de usuario?')) {
-      storageService.updateUserStatus(userId, 'rejected', []);
+      storageService.updateUserStatus(userId, 'rejected', [], []);
       setUsers(storageService.getUsers());
     }
   };
 
   const toggleBuilding = (id: string) => {
-    setTempAssignments(prev => 
+    setTempBuildings(prev => 
       prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
     );
   };
+
+  const toggleUnit = (role: Role) => {
+    setTempUnits(prev => 
+      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+    );
+  };
+
+  const ROLES_LIST: Role[] = ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'];
 
   // El Master ve a TODOS excepto a sí mismo. El Admin USAC solo ve a técnicos de otras unidades.
   const filteredUsers = users.filter(u => u.id !== currentUser.id);
@@ -85,20 +95,38 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
               </div>
 
               {editingUserId === user.id ? (
-                <div className="space-y-4 border-t border-gray-50 pt-4 animate-in slide-in-from-top-4">
-                  <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-2">Edificios Autorizados:</p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {BUILDINGS.map(b => (
-                      <button key={b.id} onClick={() => toggleBuilding(b.id)} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${tempAssignments.includes(b.id) ? 'border-yellow-400 bg-yellow-50 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-400'}`}>
-                        <div className="flex items-center gap-3">
-                           <Building2 className="w-4 h-4" />
-                           <span className="text-[10px] font-bold uppercase">{b.name} ({b.code})</span>
-                        </div>
-                        {tempAssignments.includes(b.id) && <Check className="w-4 h-4" />}
-                      </button>
-                    ))}
+                <div className="space-y-6 border-t border-gray-50 pt-6 animate-in slide-in-from-top-4">
+                  
+                  <div>
+                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Unidades Autorizadas (Botones):</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ROLES_LIST.map(role => (
+                        <button key={role} onClick={() => toggleUnit(role)} className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${tempUnits.includes(role) ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-gray-50 bg-gray-50 text-gray-400'}`}>
+                          <CheckCircle2 className={`w-3 h-3 ${tempUnits.includes(role) ? 'opacity-100' : 'opacity-20'}`} />
+                          <span className="text-[10px] font-black uppercase">{role}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <button onClick={() => saveApproval(user.id)} className="w-full p-4 bg-gray-900 text-yellow-400 rounded-2xl font-black uppercase text-xs tracking-widest mt-2">Actualizar Permisos</button>
+
+                  <div>
+                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Edificios Autorizados (Lecturas):</p>
+                    <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
+                      {BUILDINGS.map(b => (
+                        <button key={b.id} onClick={() => toggleBuilding(b.id)} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${tempBuildings.includes(b.id) ? 'border-yellow-400 bg-yellow-50 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-400'}`}>
+                          <div className="flex items-center gap-3">
+                             <Building2 className="w-4 h-4" />
+                             <span className="text-[10px] font-bold uppercase">{b.name} ({b.code})</span>
+                          </div>
+                          {tempBuildings.includes(b.id) && <Check className="w-4 h-4" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button onClick={() => saveApproval(user.id)} className="w-full p-5 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase text-xs tracking-widest mt-2 shadow-xl active:scale-95 transition-all">
+                    Guardar Configuración de Acceso
+                  </button>
                 </div>
               ) : (
                 <div className="flex gap-2">

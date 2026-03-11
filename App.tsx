@@ -11,6 +11,7 @@ import AIMaterialFlow from './components/AIMaterialFlow';
 import USACManagerPanel from './components/USACManagerPanel';
 import CalendarView from './components/CalendarView';
 import UnitDashboard from './components/UnitDashboard';
+import TeamPanel from './components/TeamPanel';
 import GasoilModule from './components/GasoilModule';
 import BoilersDashboard from './components/BoilersDashboard';
 import SalModule from './components/SalModule';
@@ -30,6 +31,15 @@ const App: React.FC = () => {
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
   const [selectedService, setSelectedService] = useState<ServiceType | null>(null);
   const [unitMenuOpen, setUnitMenuOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(true);
+
+  useEffect(() => {
+    const initSync = async () => {
+      await storageService.init();
+      setIsSyncing(false);
+    };
+    initSync();
+  }, []);
 
   // Estados para pruebas de notificaciones
   const [pushStatus, setPushStatus] = useState<string | null>(null);
@@ -85,9 +95,8 @@ const App: React.FC = () => {
     setUnitMenuOpen(false);
     
     if (service === 'luz') {
-      const defaultBuilding = BUILDINGS.find(b => b.unit === currentUser?.role) || BUILDINGS[0];
-      setSelectedBuilding(defaultBuilding);
-      setActiveTab(AppTab.SCAN);
+      setSelectedBuilding(null);
+      setActiveTab(AppTab.HOME); // This will trigger the building selection in renderContent
     } else {
       setSelectedBuilding(null);
       setActiveTab(AppTab.HOME);
@@ -110,7 +119,7 @@ const App: React.FC = () => {
   };
 
   const handleBack = () => {
-    if ([AppTab.AI_REQUEST, AppTab.AI_MATERIAL, AppTab.USAC_MANAGER, AppTab.CALENDAR, AppTab.TEAM, AppTab.GASOIL, AppTab.BOILERS, AppTab.SALT, AppTab.TEMPERATURES, AppTab.MAINTENANCE, AppTab.WATER_SYNC].includes(activeTab)) {
+    if ([AppTab.AI_REQUEST, AppTab.AI_MATERIAL, AppTab.USAC_MANAGER, AppTab.CALENDAR, AppTab.TEAM, AppTab.GASOIL, AppTab.BOILERS, AppTab.SALT, AppTab.TEMPERATURES, AppTab.MAINTENANCE, AppTab.WATER_SYNC, AppTab.HISTORY].includes(activeTab)) {
        setActiveTab(AppTab.HOME);
        setUnitMenuOpen(true);
        return;
@@ -131,7 +140,23 @@ const App: React.FC = () => {
     else if (unitMenuOpen) { setUnitMenuOpen(false); }
   };
 
+  if (isSyncing) {
+    return (
+      <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-[100]">
+        <div className="w-20 h-20 bg-yellow-400 rounded-3xl flex items-center justify-center animate-bounce shadow-2xl mb-8">
+          <ShieldCheck className="w-10 h-10 text-black" />
+        </div>
+        <h2 className="text-white font-black uppercase tracking-[0.3em] text-xs animate-pulse">Sincronizando SIGAI Cloud...</h2>
+        <p className="text-gray-500 text-[8px] font-bold uppercase tracking-widest mt-4">Conectando con el servidor central USAC</p>
+      </div>
+    );
+  }
+
   const renderContent = () => {
+    if (activeTab === AppTab.HISTORY) {
+      return <History serviceType={selectedService || undefined} building={selectedBuilding || undefined} role={currentUser?.role || 'USAC'} onNavigate={(tab) => setActiveTab(tab)} />;
+    }
+
     if (activeTab === AppTab.CALENDAR && currentUser) {
       return <CalendarView user={currentUser} onNavigate={setActiveTab} />;
     }
@@ -161,14 +186,7 @@ const App: React.FC = () => {
     }
 
     if (activeTab === AppTab.TEAM && currentUser) {
-      return (
-        <div className="p-6 text-center py-20 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 w-full max-w-sm">
-           <Users className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-relaxed">
-             Módulo de carga de trabajo en desarrollo v1.1<br/>Consulta las asignaciones en tu Agenda.
-           </p>
-        </div>
-      );
+      return <TeamPanel currentUser={currentUser} />;
     }
 
     if (activeTab === AppTab.AI_REQUEST && currentUser) {
@@ -208,14 +226,14 @@ const App: React.FC = () => {
           </div>
           
           <div className="grid grid-cols-2 gap-4 w-full px-2">
-            <UnitButton icon="🏢" label='USAC "Rojas Navarrete"' onClick={() => handleUnitClick('USAC')} full />
-            <UnitButton icon="🏛️" label="Cuartel General" onClick={() => handleUnitClick('CG')} />
-            <UnitButton icon="👥" label="Grupo C. General" onClick={() => handleUnitClick('GCG')} />
-            <UnitButton icon="⚔️" label="GOE III" onClick={() => handleUnitClick('GOE3')} />
-            <UnitButton icon="⚔️" label="GOE IV" onClick={() => handleUnitClick('GOE4')} />
-            <UnitButton icon="🦅" label="BOEL XIX" onClick={() => handleUnitClick('BOEL')} />
-            <UnitButton icon="🎖️" label="UMOE" onClick={() => handleUnitClick('UMOE')} />
-            <UnitButton icon="📡" label="CECOM" onClick={() => handleUnitClick('CECOM')} />
+            {(!currentUser || currentUser.assignedUnits?.includes('USAC')) && <UnitButton icon="🏢" label='USAC "Rojas Navarrete"' onClick={() => handleUnitClick('USAC')} full />}
+            {(!currentUser || currentUser.assignedUnits?.includes('CG')) && <UnitButton icon="🏛️" label="Cuartel General" onClick={() => handleUnitClick('CG')} />}
+            {(!currentUser || currentUser.assignedUnits?.includes('GCG')) && <UnitButton icon="👥" label="Grupo C. General" onClick={() => handleUnitClick('GCG')} />}
+            {(!currentUser || currentUser.assignedUnits?.includes('GOE3')) && <UnitButton icon="⚔️" label="GOE III" onClick={() => handleUnitClick('GOE3')} />}
+            {(!currentUser || currentUser.assignedUnits?.includes('GOE4')) && <UnitButton icon="⚔️" label="GOE IV" onClick={() => handleUnitClick('GOE4')} />}
+            {(!currentUser || currentUser.assignedUnits?.includes('BOEL')) && <UnitButton icon="🦅" label="BOEL XIX" onClick={() => handleUnitClick('BOEL')} />}
+            {(!currentUser || currentUser.assignedUnits?.includes('UMOE')) && <UnitButton icon="🎖️" label="UMOE" onClick={() => handleUnitClick('UMOE')} />}
+            {(!currentUser || currentUser.assignedUnits?.includes('CECOM')) && <UnitButton icon="📡" label="CECOM" onClick={() => handleUnitClick('CECOM')} />}
           </div>
 
           <div className="w-full px-2 mt-8 space-y-4">
@@ -236,7 +254,7 @@ const App: React.FC = () => {
       );
     }
 
-    if (unitMenuOpen && !selectedService && currentUser) {
+    if (unitMenuOpen && !selectedService && currentUser && activeTab === AppTab.HOME) {
       return (
         <UnitDashboard 
           user={currentUser}
@@ -248,7 +266,13 @@ const App: React.FC = () => {
     }
     
     if (selectedService && !selectedBuilding) {
-      const visibleBuildings = BUILDINGS.filter(b => isMaster || b.unit === currentUser?.role || currentUser?.role === 'USAC');
+      let visibleBuildings = BUILDINGS.filter(b => isMaster || b.unit === currentUser?.role || currentUser?.role === 'USAC');
+      
+      // Filter for Luz specific sites if service is Luz
+      if (selectedService === 'luz') {
+        visibleBuildings = BUILDINGS.filter(b => b.id === 'CT_1_2' || b.id === 'CT_3');
+      }
+
       return (
         <div className="space-y-4 py-6 w-full max-w-sm mx-auto animate-in slide-in-from-bottom-5">
           <div className="text-center mb-8 px-4">
@@ -257,7 +281,14 @@ const App: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 gap-4 px-2">
             {visibleBuildings.map(b => (
-              <button key={b.id} onClick={() => setSelectedBuilding(b)} className="w-full flex items-center justify-between p-7 bg-white border-2 border-gray-50 rounded-[2.5rem] hover:border-gray-900 transition-all active:scale-95 shadow-sm group">
+              <button 
+                key={b.id} 
+                onClick={() => {
+                  setSelectedBuilding(b);
+                  setActiveTab(AppTab.SCAN);
+                }} 
+                className="w-full flex items-center justify-between p-7 bg-white border-2 border-gray-50 rounded-[2.5rem] hover:border-gray-900 transition-all active:scale-95 shadow-sm group"
+              >
                 <div className="text-left">
                   <div className="font-black text-lg uppercase text-gray-900">{b.name}</div>
                   <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{b.code}</div>
@@ -272,7 +303,6 @@ const App: React.FC = () => {
 
     if (selectedBuilding && selectedService) {
       if (activeTab === AppTab.DASHBOARD) return <Dashboard serviceType={selectedService} building={selectedBuilding} role={currentUser!.role} onNavigate={(tab) => setActiveTab(tab)} />;
-      if (activeTab === AppTab.HISTORY) return <History serviceType={selectedService} building={selectedBuilding} role={currentUser!.role} onNavigate={(tab) => setActiveTab(tab)} />;
       if (activeTab === AppTab.SCAN) return <Scanner serviceType={selectedService} building={selectedBuilding} user={currentUser!} onComplete={() => setActiveTab(AppTab.DASHBOARD)} />;
     }
 
@@ -297,6 +327,49 @@ const App: React.FC = () => {
               </button>
            </div>
          </div>
+
+         {/* Gestión de Permisos (Solo para Técnicos Manto) */}
+         {currentUser.isManto && (
+            <div className="space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 px-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-red-500" /> Calendario Laboral / Permisos
+              </h3>
+              <div className="bg-white border border-gray-100 rounded-[3rem] p-8 shadow-sm space-y-4">
+                <p className="text-[9px] text-gray-400 font-bold uppercase leading-relaxed">
+                  Marca los días en los que no estarás disponible para el servicio (Permisos, Bajas, Vacaciones).
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  <input 
+                    type="date" 
+                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 font-bold text-xs"
+                    onChange={(e) => {
+                      const date = e.target.value;
+                      if (!date) return;
+                      const currentLeave = currentUser.leaveDays || [];
+                      if (currentLeave.includes(date)) return;
+                      const updated = [...currentLeave, date];
+                      storageService.updateUserLeaveDays(currentUser.id, updated);
+                      setCurrentUser({...currentUser, leaveDays: updated});
+                    }}
+                  />
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(currentUser.leaveDays || []).sort().map(date => (
+                      <div key={date} className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-xl text-[9px] font-black uppercase">
+                        {date}
+                        <button onClick={() => {
+                          const updated = (currentUser.leaveDays || []).filter(d => d !== date);
+                          storageService.updateUserLeaveDays(currentUser.id, updated);
+                          setCurrentUser({...currentUser, leaveDays: updated});
+                        }}>
+                          <PlusCircle className="w-3 h-3 rotate-45" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
          {/* Panel de Pruebas de Notificaciones */}
          <div className="space-y-6">
@@ -358,7 +431,12 @@ const App: React.FC = () => {
       hideHeader={hideHeader}
     >
       <div className="flex flex-col items-center w-full">
-        {renderContent()}
+        {isSyncing ? (
+          <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+            <Zap className="w-12 h-12 text-yellow-400 animate-bounce mb-4" />
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Sincronizando con SIGAI Cloud...</p>
+          </div>
+        ) : renderContent()}
       </div>
       {showAuthModal && authRole && <AuthModal initialRole={authRole} onLogin={handleLoginSuccess} onClose={() => setShowAuthModal(false)} />}
     </Layout>

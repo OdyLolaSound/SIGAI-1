@@ -29,7 +29,15 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
   const pendingTasksCount = tasks.filter(t => t.status !== 'Completada').length;
   const urgentRequests = requests.filter(r => r.urgency === 'Crítica' && r.status !== 'closed').length;
   const mediumRequests = requests.filter(r => (r.urgency === 'Alta' || r.urgency === 'Media') && r.status !== 'closed').length;
-  const activeTechs = team.filter(u => u.status === 'approved').length;
+  
+  const activeTechs = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return team.filter(u => 
+      u.status === 'approved' && 
+      u.isManto && 
+      (!u.leaveDays || !u.leaveDays.includes(today))
+    ).length;
+  }, [team]);
 
   // Real data for water
   const waterLast = waterReadings[waterReadings.length - 1];
@@ -52,6 +60,8 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
     return Math.round((closed / total) * 100);
   }, [requests]);
 
+  const isRestricted = !isMaster && user.role !== 'USAC';
+  
   return (
     <div className="w-full max-w-sm mx-auto space-y-10 pb-32 animate-in fade-in duration-500">
       
@@ -67,37 +77,42 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
              </button>
           </div>
           <h2 className="text-3xl font-black uppercase tracking-tighter leading-none mb-2">
-            {isMaster ? 'MÓDULO MAESTRO' : `USAC ${user.role}`}
+            {isMaster ? 'MÓDULO MAESTRO' : `UNIDAD ${user.role}`}
           </h2>
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">Sistema Integrado de Apoyo</p>
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">
+            {isRestricted ? 'Solicitud de Apoyo Técnico' : 'Sistema Integrado de Apoyo'}
+          </p>
         </div>
         <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
           <Warehouse className="w-32 h-32" />
         </div>
       </div>
 
-      {/* SECCIÓN 1: GESTIÓN DIARIA */}
+      {/* SECCIÓN: GESTIÓN DE PETICIONES (RESTRICTED OR FULL) */}
       <section className="space-y-4 px-2">
         <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-          <ClipboardList className="w-4 h-4 text-yellow-500" /> Gestión Operativa
+          <ClipboardList className="w-4 h-4 text-yellow-500" /> {isRestricted ? 'Nueva Solicitud' : 'Gestión Operativa'}
         </h3>
         <div className="grid grid-cols-1 gap-4">
-          <ActionButton 
-            icon={<Calendar className="w-6 h-6" />}
-            title="Mi Agenda"
-            desc="Tareas y mantenimiento"
-            badge={pendingTasksCount > 0 ? `${pendingTasksCount} Pendientes` : undefined}
-            onClick={() => onNavigate(AppTab.CALENDAR)}
-            color="bg-white border-gray-100"
-          />
-          <div className="grid grid-cols-2 gap-3">
+          {!isRestricted && (
+            <ActionButton 
+              icon={<Calendar className="w-6 h-6" />}
+              title="Mi Agenda"
+              desc="Tareas y mantenimiento"
+              badge={pendingTasksCount > 0 ? `${pendingTasksCount} Pendientes` : undefined}
+              onClick={() => onNavigate(AppTab.CALENDAR)}
+              color="bg-white border-gray-100"
+            />
+          )}
+          
+          <div className={`grid ${isRestricted ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
             <ActionButton 
               icon={<MessageSquare className="w-5 h-5" />}
               title="Abrir Parte"
               desc="Incidencias IA"
               onClick={() => onRequestClick('peticion')}
               color="bg-blue-50 border-blue-100 text-blue-900"
-              compact
+              compact={!isRestricted}
             />
             <ActionButton 
               icon={<Package className="w-5 h-5" />}
@@ -105,101 +120,105 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
               desc="Gestión Almacén"
               onClick={() => onRequestClick('material')}
               color="bg-amber-50 border-amber-100 text-amber-900"
-              compact
+              compact={!isRestricted}
             />
           </div>
         </div>
       </section>
 
-      {/* SECCIÓN 2: CONSUMOS Y SUMINISTROS */}
-      <section className="space-y-4 px-2">
-        <div className="flex justify-between items-center">
-          <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-blue-500" /> Consumos y Suministros
-          </h3>
-          <button onClick={() => onNavigate(AppTab.HISTORY)} className="text-[9px] font-black text-blue-600 uppercase">Historial</button>
-        </div>
-        
-        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-          <ConsumptionCard 
-            icon={<Zap className="w-5 h-5" />} 
-            title="Luz" 
-            value={stats.luz.val} 
-            unit={stats.luz.unit}
-            trend={stats.luz.trend}
-            up={stats.luz.up}
-            color="bg-yellow-400"
-            onClick={() => onServiceClick('luz')}
-          />
-          <ConsumptionCard 
-            icon={<Droplets className="w-5 h-5" />} 
-            title="Agua" 
-            value={stats.agua.val} 
-            unit={stats.agua.unit}
-            trend={stats.agua.trend}
-            up={stats.agua.up}
-            color={stats.agua.up ? "bg-red-500" : "bg-blue-500"}
-            onClick={() => onNavigate(AppTab.WATER_SYNC)}
-          />
-          <ConsumptionCard 
-            icon={<Flame className="w-5 h-5" />} 
-            title="Calderas" 
-            value={19} 
-            unit="Tanques"
-            trend="Control SIGAI"
-            up={null}
-            color="bg-orange-600"
-            onClick={() => onNavigate(AppTab.BOILERS)}
-          />
-        </div>
-      </section>
+      {!isRestricted && (
+        <>
+          {/* SECCIÓN 2: CONSUMOS Y SUMINISTROS */}
+          <section className="space-y-4 px-2">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-blue-500" /> Consumos y Suministros
+              </h3>
+              <button onClick={() => onNavigate(AppTab.HISTORY)} className="text-[9px] font-black text-blue-600 uppercase">Historial</button>
+            </div>
+            
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+              <ConsumptionCard 
+                icon={<Zap className="w-5 h-5" />} 
+                title="Luz" 
+                value={stats.luz.val} 
+                unit={stats.luz.unit}
+                trend={stats.luz.trend}
+                up={stats.luz.up}
+                color="bg-yellow-400"
+                onClick={() => onServiceClick('luz')}
+              />
+              <ConsumptionCard 
+                icon={<Droplets className="w-5 h-5" />} 
+                title="Agua" 
+                value={stats.agua.val} 
+                unit={stats.agua.unit}
+                trend={stats.agua.trend}
+                up={stats.agua.up}
+                color={stats.agua.up ? "bg-red-500" : "bg-blue-500"}
+                onClick={() => onNavigate(AppTab.WATER_SYNC)}
+              />
+              <ConsumptionCard 
+                icon={<Flame className="w-5 h-5" />} 
+                title="Calderas" 
+                value={19} 
+                unit="Tanques"
+                trend="Control SIGAI"
+                up={null}
+                color="bg-orange-600"
+                onClick={() => onNavigate(AppTab.BOILERS)}
+              />
+            </div>
+          </section>
 
-      {/* SECCIÓN 3: EQUIPO Y GESTIÓN USAC */}
-      <section className="space-y-4 px-2">
-        <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-          <Users className="w-4 h-4 text-purple-500" /> Mi Equipo USAC
-        </h3>
-        
-        <div className="grid grid-cols-1 gap-4">
-          <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-sm">
-             <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
-                   <div className="p-3 bg-purple-50 rounded-xl text-purple-600"><Users className="w-5 h-5" /></div>
-                   <div>
-                      <span className="text-[10px] font-black text-gray-900 uppercase">Técnicos Activos</span>
-                      <div className="text-2xl font-black">{activeTechs}</div>
-                   </div>
-                </div>
-                <button onClick={() => onNavigate(AppTab.TEAM)} className="p-3 bg-gray-900 text-white rounded-xl shadow-lg active:scale-95">
-                   <ChevronRight className="w-4 h-4" />
-                </button>
-             </div>
-             
-             <div className="grid grid-cols-3 gap-3">
-                <StatusBox label="Urgente" val={urgentRequests} color="text-red-600 bg-red-50" />
-                <StatusBox label="Media" val={mediumRequests} color="text-amber-600 bg-amber-50" />
-                <StatusBox label="Finalizado" val={requests.filter(r => r.status === 'closed').length} color="text-green-600 bg-green-50" />
-             </div>
+          {/* SECCIÓN 3: EQUIPO Y GESTIÓN USAC */}
+          <section className="space-y-4 px-2">
+            <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-500" /> Mi Equipo USAC
+            </h3>
+            
+            <div className="grid grid-cols-1 gap-4">
+              <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-sm">
+                 <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                       <div className="p-3 bg-purple-50 rounded-xl text-purple-600"><Users className="w-5 h-5" /></div>
+                       <div>
+                          <span className="text-[10px] font-black text-gray-900 uppercase">Técnicos Activos</span>
+                          <div className="text-2xl font-black">{activeTechs}</div>
+                       </div>
+                    </div>
+                    <button onClick={() => onNavigate(AppTab.TEAM)} className="p-3 bg-gray-900 text-white rounded-xl shadow-lg active:scale-95">
+                       <ChevronRight className="w-4 h-4" />
+                    </button>
+                 </div>
+                 
+                 <div className="grid grid-cols-3 gap-3">
+                    <StatusBox label="Urgente" val={urgentRequests} color="text-red-600 bg-red-50" />
+                    <StatusBox label="Media" val={mediumRequests} color="text-amber-600 bg-amber-50" />
+                    <StatusBox label="Finalizado" val={requests.filter(r => r.status === 'closed').length} color="text-green-600 bg-green-50" />
+                 </div>
 
-             <div className="mt-6 space-y-2">
-                <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-gray-400">
-                   <span>SLA Diario</span>
-                   <span>{progresoGeneral}%</span>
-                </div>
-                <div className="h-2 w-full bg-gray-50 rounded-full overflow-hidden border border-gray-100">
-                   <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${progresoGeneral}%` }} />
-                </div>
-             </div>
-          </div>
+                 <div className="mt-6 space-y-2">
+                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-gray-400">
+                       <span>SLA Diario</span>
+                       <span>{progresoGeneral}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-gray-50 rounded-full overflow-hidden border border-gray-100">
+                       <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${progresoGeneral}%` }} />
+                    </div>
+                 </div>
+              </div>
 
-          <button 
-            onClick={() => onNavigate(AppTab.USAC_MANAGER)}
-            className="w-full p-6 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all"
-          >
-            <ClipboardList className="w-5 h-5" /> Panel Gestión de Prioridades
-          </button>
-        </div>
-      </section>
+              <button 
+                onClick={() => onNavigate(AppTab.USAC_MANAGER)}
+                className="w-full p-6 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all"
+              >
+                <ClipboardList className="w-5 h-5" /> Panel Gestión de Prioridades
+              </button>
+            </div>
+          </section>
+        </>
+      )}
 
     </div>
   );
