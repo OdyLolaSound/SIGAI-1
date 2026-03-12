@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, User, CheckCircle2, AlertCircle, AlertTriangle, Send, Trash2, X, Building, Users } from 'lucide-react';
 import { CalendarTask, User as UserType, UrgencyLevel, AppTab, ExternalUser } from '../types';
 import { storageService } from '../services/storageService';
+import { getLocalDateString } from '../services/dateUtils';
 import TaskForm from './TaskForm';
 
 interface CalendarViewProps {
@@ -58,9 +59,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
   };
 
   const selectedTasks = useMemo(() => {
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = getLocalDateString(selectedDate);
     return tasks.filter(t => t.startDate === dateStr).sort((a,b) => (a.startTime || '').localeCompare(b.startTime || ''));
   }, [tasks, selectedDate]);
+
+  const techniciansOff = useMemo(() => {
+    const dateStr = getLocalDateString(selectedDate);
+    return storageService.getUsers().filter(u => u.isManto && u.leaveDays?.includes(dateStr)).map(u => {
+      const entry = u.leaveEntries?.find(e => dateStr >= e.startDate && dateStr <= e.endDate);
+      return { ...u, leaveType: entry?.type };
+    });
+  }, [selectedDate]);
 
   const handleToggleTaskStatus = (task: CalendarTask) => {
     const newStatus = task.status === 'Completada' ? 'Pendiente' : 'Completada';
@@ -124,7 +133,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
           ))}
           {daysInMonth.map((day, idx) => {
             if (!day) return <div key={`empty-${idx}`} className="h-12" />;
-            const dateStr = day.toISOString().split('T')[0];
+            const dateStr = getLocalDateString(day);
             const dayTasks = tasks.filter(t => t.startDate === dateStr);
             const isSelected = selectedDate.toDateString() === day.toDateString();
             const isToday = new Date().toDateString() === day.toDateString();
@@ -135,13 +144,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
                 className={`relative h-12 flex flex-col items-center justify-center rounded-xl transition-all active:scale-90 ${isSelected ? 'bg-gray-900 text-white shadow-xl scale-110 z-10' : isToday ? 'bg-yellow-50 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
               >
                 <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-gray-900'}`}>{day.getDate()}</span>
-                {dayTasks.length > 0 && (
-                  <div className="flex gap-0.5 mt-1">
-                    {dayTasks.slice(0, 3).map((t, i) => (
-                      <div key={i} className={`w-1 h-1 rounded-full ${getPriorityColor(t.priority)}`} />
-                    ))}
-                  </div>
-                )}
+                <div className="flex flex-col items-center gap-0.5 mt-1">
+                  {dayTasks.length > 0 && (
+                    <div className="flex gap-0.5">
+                      {dayTasks.slice(0, 3).map((t, i) => (
+                        <div key={i} className={`w-1 h-1 rounded-full ${getPriorityColor(t.priority)}`} />
+                      ))}
+                    </div>
+                  )}
+                  {storageService.getUsers().some(u => u.isManto && u.leaveDays?.includes(dateStr)) && (
+                    <div className="w-4 h-0.5 bg-red-400 rounded-full" />
+                  )}
+                </div>
               </button>
             );
           })}
@@ -162,6 +176,30 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
              <Plus className="w-4 h-4" /> Nueva
            </button>
         </div>
+
+        {/* Técnicos de Baja/Libres */}
+        {techniciansOff.length > 0 && (
+          <div className="px-2">
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center gap-4">
+              <div className="w-10 h-10 bg-red-100 text-red-600 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[8px] font-black text-red-400 uppercase tracking-widest mb-1">Técnicos no disponibles</div>
+                <div className="flex flex-wrap gap-2">
+                  {techniciansOff.map(tech => (
+                    <div key={tech.id} className="flex flex-col">
+                      <span className="text-[10px] font-black text-red-600 uppercase">{tech.name}</span>
+                      {tech.leaveType && (
+                        <span className="text-[7px] font-bold text-red-400 uppercase tracking-tighter">{tech.leaveType}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3">
           {selectedTasks.length === 0 ? (
@@ -265,7 +303,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
       {showForm && (
         <TaskForm 
           user={user} 
-          initialDate={selectedDate.toISOString().split('T')[0]}
+          initialDate={getLocalDateString(selectedDate)}
           task={editingTask}
           onClose={() => { setShowForm(false); setEditingTask(undefined); }} 
         />

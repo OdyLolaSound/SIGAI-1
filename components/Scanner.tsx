@@ -3,6 +3,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Camera, X, Loader2, Keyboard, Droplets, Zap, Flame, Upload, Globe, Thermometer, Gauge, AlertTriangle, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { extractReadingsForService, parseEuropeanNumber } from '../services/geminiService';
 import { storageService } from '../services/storageService';
+import { getLocalDateString } from '../services/dateUtils';
 import { Reading, ServiceType, Building, ReadingOrigin, User } from '../types';
 
 interface ScannerProps {
@@ -21,7 +22,7 @@ const Scanner: React.FC<ScannerProps> = ({ serviceType, building, user, onComple
   const [temp, setTemp] = useState<string>("");
   const [note, setNote] = useState("");
   const [origin, setOrigin] = useState<ReadingOrigin>('manual');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [step, setStep] = useState<'selection' | 'confirm'>('selection');
   
   const [lastReading, setLastReading] = useState<Reading | null>(null);
@@ -51,11 +52,26 @@ const Scanner: React.FC<ScannerProps> = ({ serviceType, building, user, onComple
   const processImage = async (base64: string) => {
     setLoading(true);
     setStep('confirm');
-    setOrigin('manual');
-    const result = await extractReadingsForService(base64, serviceType);
-    if (result.v1 !== null) setVal1(result.v1.toString().replace('.', ','));
-    if (result.v2 !== null) setVal2(result.v2.toString().replace('.', ','));
-    setLoading(false);
+    
+    try {
+      const result = await extractReadingsForService(base64, serviceType);
+      
+      if (result.v1 !== null) {
+        setVal1(result.v1.toString().replace('.', ','));
+        setOrigin('ai');
+      } else {
+        setOrigin('manual');
+      }
+      
+      if (result.v2 !== null) {
+        setVal2(result.v2.toString().replace('.', ','));
+      }
+    } catch (error) {
+      console.error("Error procesando imagen:", error);
+      setOrigin('manual');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleTelemetrySync = async () => {
@@ -203,11 +219,18 @@ const Scanner: React.FC<ScannerProps> = ({ serviceType, building, user, onComple
 
       <div className="space-y-4 px-2">
         <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${!v1Status.valid ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100 shadow-sm'}`}>
-          <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">
-            {serviceType === 'luz' 
-              ? (building.id === 'CT_1_2' ? 'Contador CT 1 (kWh)' : building.id === 'CT_3' ? 'Contador CT 3 (kWh)' : 'Contador A (kWh)') 
-              : serviceType === 'agua' ? 'Caudalímetro (m³)' : 'Consumo (Horas)'}
-          </label>
+          <div className="flex items-center justify-between mb-4">
+            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] block">
+              {serviceType === 'luz' 
+                ? (building.id === 'CT_1_2' ? 'Contador CT 1 (kWh)' : building.id === 'CT_3' ? 'Contador CT 3 (kWh)' : 'Contador A (kWh)') 
+                : serviceType === 'agua' ? 'Caudalímetro (m³)' : 'Consumo (Horas)'}
+            </label>
+            {origin === 'ai' && val1 && (
+              <span className="flex items-center gap-1 text-[8px] font-black text-green-600 uppercase bg-green-50 px-2 py-1 rounded-full animate-pulse">
+                <CheckCircle2 className="w-3 h-3" /> Detectado por AI
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-4 mb-4">
              <div className="flex-1 text-center opacity-30">
                 <div className="text-[8px] font-black uppercase mb-1">Anterior</div>
@@ -233,6 +256,16 @@ const Scanner: React.FC<ScannerProps> = ({ serviceType, building, user, onComple
             <input type="text" inputMode="decimal" value={val2} onChange={e => setVal2(e.target.value)} className="w-full p-6 bg-gray-50 rounded-3xl text-4xl font-mono text-center outline-none border-2 border-transparent focus:border-yellow-400 transition-all font-black text-gray-900" placeholder="00000.0" />
           </div>
         )}
+
+        <div className="p-6 rounded-[2.5rem] bg-white border-2 border-gray-100 shadow-sm">
+          <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">Fecha de Lectura</label>
+          <input 
+            type="date" 
+            value={date} 
+            onChange={e => setDate(e.target.value)} 
+            className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 font-bold text-xs outline-none focus:border-yellow-400 transition-all"
+          />
+        </div>
 
         <button onClick={handleSave} className="w-full p-7 bg-gray-900 text-yellow-400 rounded-[2.5rem] font-black shadow-2xl active:scale-95 transition-all uppercase tracking-[0.2em] text-sm mt-4 hover:bg-black">
           Validar Lectura Oficial

@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { WaterAccount, WaterSyncLog, AppTab, User, Reading } from '../types';
 import { storageService } from '../services/storageService';
+import { getLocalDateString } from '../services/dateUtils';
 
 interface WaterSyncModuleProps {
   user: User;
@@ -32,7 +33,7 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
 
   // Manual Form
   const [manualForm, setManualForm] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     value: 0,
     consumption: 0
   });
@@ -60,7 +61,7 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
     if (readings.length === 0) return { today: 0, week: 0, weekPrev: 0, month: 0, monthPrev: 0, avg: 0 };
     
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getLocalDateString(now);
     
     const today = readings.find(r => r.date === todayStr)?.consumption1 || 0;
     
@@ -146,7 +147,7 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
   if (!account) return null;
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-6 pb-24 animate-in fade-in duration-500">
+    <div className="w-full max-w-sm mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
       
       {/* HEADER SECTION */}
       <div className="flex items-center justify-between px-2">

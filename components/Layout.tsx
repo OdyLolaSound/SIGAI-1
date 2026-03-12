@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Home, Camera, History, Settings, ShieldCheck, ChevronLeft, Building2, Crown, User as UserIcon, Home as HomeIcon, Calendar as CalendarIcon, Bell } from 'lucide-react';
+import { ShieldCheck, ChevronLeft, Crown, User as UserIcon, Home as HomeIcon, Calendar as CalendarIcon, Bell } from 'lucide-react';
 import { AppTab, User, CalendarTask, AppNotification } from '../types';
 import { storageService } from '../services/storageService';
+import { getLocalDateString } from '../services/dateUtils';
 import NotificationCenter from './NotificationCenter';
 
 interface LayoutProps {
@@ -31,7 +32,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onBa
         setUnreadCount(notifications.filter(n => !n.read).length);
 
         const tasks = storageService.getTasks();
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getLocalDateString();
         const count = tasks.filter(t => t.startDate === todayStr && t.status !== 'Completada').length;
         setTodayTasksCount(count);
       };
@@ -43,7 +44,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onBa
   }, [user]);
 
   return (
-    <div className="flex flex-col min-h-screen pb-12 max-w-md mx-auto bg-white shadow-2xl relative overflow-hidden">
+    <div className="flex flex-col min-h-screen max-w-md mx-auto bg-white shadow-2xl relative overflow-hidden">
       {/* Header Premium */}
       {!hideHeader && (
         <header className={`p-5 sticky top-0 z-40 flex items-center justify-between border-b shadow-lg transition-all duration-500 ${isMaster ? 'bg-yellow-400 border-yellow-600' : 'bg-gray-900 border-white/5'}`}>
@@ -122,32 +123,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onBa
           }}
         />
       )}
-
-      {/* Barra de navegación inferior */}
-      {!hideNav && (
-        <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[340px] bg-gray-900/95 backdrop-blur-xl rounded-[2.5rem] flex items-center justify-around py-3 px-2 z-50 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-white/10 animate-in slide-in-from-bottom-10 duration-500">
-          <NavItem icon={<Home className="w-5 h-5" />} label="Inicio" active={activeTab === AppTab.HOME} onClick={() => setActiveTab(AppTab.HOME)} />
-          {isUSAC && (
-            <>
-              <NavItem icon={<History className="w-5 h-5" />} label="Historial" active={activeTab === AppTab.HISTORY} onClick={() => setActiveTab(AppTab.HISTORY)} />
-              <button onClick={() => setActiveTab(AppTab.SCAN)} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-xl active:scale-90 relative -top-2 ${activeTab === AppTab.SCAN ? 'bg-white text-black rotate-90' : 'bg-yellow-400 text-black hover:scale-105'}`}>
-                <Camera className="w-7 h-7" />
-              </button>
-              <NavItem icon={<Building2 className="w-5 h-5" />} label="Panel" active={activeTab === AppTab.DASHBOARD} onClick={() => setActiveTab(AppTab.DASHBOARD)} />
-            </>
-          )}
-          <NavItem icon={<Settings className="w-5 h-5" />} label="Perfil" active={activeTab === AppTab.SETTINGS} onClick={() => setActiveTab(AppTab.SETTINGS)} />
-        </nav>
-      )}
     </div>
   );
 };
-
-const NavItem: React.FC<{ icon: React.ReactNode; label: string; active: boolean; onClick: () => void }> = ({ icon, label, active, onClick }) => (
-  <button onClick={onClick} className={`flex flex-col items-center gap-1 px-3 transition-all duration-300 ${active ? 'text-yellow-400 scale-110' : 'text-gray-500 hover:text-gray-300'}`}>
-    <div>{icon}</div>
-    <span className="text-[7px] font-black uppercase tracking-[0.15em]">{label}</span>
-  </button>
-);
 
 export default Layout;

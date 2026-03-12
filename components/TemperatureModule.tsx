@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Thermometer, Plus, X, Search, ChevronRight, LayoutGrid, Info, ArrowLeft, ThermometerSnowflake, Gauge, AlertTriangle, CheckCircle2, History } from 'lucide-react';
 import { Boiler, User, BoilerTemperatureReading, AppTab } from '../types';
 import { storageService } from '../services/storageService';
+import { getLocalDateString } from '../services/dateUtils';
 
 interface TemperatureModuleProps {
   user: User;
@@ -51,7 +52,7 @@ const TemperatureModule: React.FC<TemperatureModuleProps> = ({ user, onNavigate 
     const newReading: BoilerTemperatureReading = {
       id: crypto.randomUUID(),
       boilerId: selectedBoilerId,
-      date: new Date().toISOString(),
+      date: getLocalDateString(),
       tempImpulsion: form.tempImpulsion,
       tempRetorno: form.tempRetorno,
       pressure: form.pressure,
@@ -69,7 +70,7 @@ const TemperatureModule: React.FC<TemperatureModuleProps> = ({ user, onNavigate 
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-6 pb-24 animate-in fade-in duration-500">
+    <div className="w-full max-w-sm mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
       
       {/* HEADER SECTION */}
       <div className="flex items-center justify-between px-2">

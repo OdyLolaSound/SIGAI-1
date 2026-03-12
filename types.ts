@@ -2,7 +2,7 @@
 export type Role = 'USAC' | 'CG' | 'GCG' | 'GOE3' | 'GOE4' | 'BOEL' | 'UMOE' | 'CECOM' | 'MASTER';
 export type UserStatus = 'pending' | 'approved' | 'rejected';
 export type ServiceType = 'luz' | 'agua' | 'caldera' | 'peticion' | 'material' | 'gasoil' | 'sal' | 'temperatura' | 'mantenimiento';
-export type ReadingOrigin = 'manual' | 'telematica';
+export type ReadingOrigin = 'manual' | 'telematica' | 'ai';
 export type RequestCategory = 'Eléctrico' | 'Fontanería' | 'Calderas / Climatización' | 'Carpintería / Cerraduras' | 'Mobiliario' | 'Informática' | 'Otros' | 'Logística / Almacén' | 'Combustible';
 export type UrgencyLevel = 'Baja' | 'Media' | 'Alta' | 'Crítica' | 'Rutina';
 
@@ -21,6 +21,36 @@ export interface User {
   workload?: number;
   isManto?: boolean;
   leaveDays?: string[]; // ISO dates YYYY-MM-DD
+  leaveEntries?: LeaveEntry[];
+}
+
+export type LeaveType = 
+  | 'Vacaciones'
+  | 'Asuntos Propios'
+  | 'Descanso Obligatorio'
+  | 'Descanso Adicional'
+  | 'Maniobras'
+  | 'Baja Médica'
+  | 'Enfermo Domicilio'
+  | 'Permisos Varios (Hospitalización/enfermedad familiar 1º o 2º grado, Otros permisos)'
+  | 'Conciliación Familiar'
+  | 'Comisión de Servicio'
+  | 'Ejercicios Varios'
+  | 'Servicio de Guardia'
+  | 'Jornada de Instrucción Prolongada'
+  | 'Jornada de Instrucción Continuada'
+  | 'Curso'
+  | 'Flexibilidad Horaria'
+  | 'Reducción de Jornada'
+  | 'Otro';
+
+export interface LeaveEntry {
+  id: string;
+  type: LeaveType;
+  startDate: string;
+  endDate: string;
+  notes?: string;
+  createdAt: string;
 }
 
 // --- WATER TELEMETRY TYPES (AGUAS DE ALICANTE) ---

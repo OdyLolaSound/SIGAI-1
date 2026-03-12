@@ -1,5 +1,6 @@
 
-import { Reading, Building, ServiceType, Role, User, UserStatus, RequestItem, GasoilTank, Boiler, BoilerTemperatureReading, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, SaltWarehouse, SaltSoftener, CalendarTask, AppNotification, GasoilReading, RefuelRequest, SaltRefillLog, SaltEntryLog, ExternalUser, WaterAccount, WaterSyncLog, GasoilAlertStatus, Provider, MaterialCategory, MaterialItem } from '../types';
+import { Reading, Building, ServiceType, Role, User, UserStatus, RequestItem, GasoilTank, Boiler, BoilerTemperatureReading, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, SaltWarehouse, SaltSoftener, CalendarTask, AppNotification, GasoilReading, RefuelRequest, SaltRefillLog, SaltEntryLog, ExternalUser, WaterAccount, WaterSyncLog, GasoilAlertStatus, Provider, MaterialCategory, MaterialItem, LeaveEntry } from '../types';
+import { getLocalDateString } from './dateUtils';
 
 const READINGS_KEY = 'sigai_readings_v5';
 const USERS_KEY = 'sigai_users_v5';
@@ -124,6 +125,18 @@ export const PIEZAS_COMUNES: BoilerPart[] = [
 export const storageService = {
   // --- SYNC ---
   init: async () => {
+    const users = storageService.getUsers();
+    let changed = false;
+    const updated = users.map(u => {
+      if ((u.id === 'tech-1' || u.id === 'unit-1') && !u.isManto) {
+        changed = true;
+        return { ...u, isManto: true };
+      }
+      return u;
+    });
+    if (changed) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(updated));
+    }
     return await fetchFromServer();
   },
 
@@ -221,7 +234,7 @@ export const storageService = {
       const newReading: Reading = {
         id: crypto.randomUUID(),
         buildingId: 'BASE_ALICANTE',
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         timestamp: new Date().toISOString(),
         userId: 'system_bot',
         serviceType: 'agua',
@@ -271,13 +284,18 @@ export const storageService = {
     }
   },
 
+  // --- BUILDINGS ---
+  getBuildings: (): Building[] => {
+    return BUILDINGS;
+  },
+
   // --- USERS ---
   getUsers: (): User[] => {
     const data = localStorage.getItem(USERS_KEY);
     const initial: User[] = [
       { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] },
-      { id: 'tech-1', name: 'Técnico USAC', username: 'user@picks.pro', password: '123', role: 'USAC', status: 'approved', assignedBuildings: BUILDINGS.map(b => b.id), assignedUnits: ['USAC'], phone: '34600000000', specialty: 'Electricidad' },
-      { id: 'unit-1', name: 'Técnico GOE III', username: 'unit@picks.pro', password: '123', role: 'GOE3', status: 'approved', assignedBuildings: BUILDINGS.filter(b => b.unit === 'GOE3').map(b => b.id), assignedUnits: ['GOE3'], phone: '34611111111', specialty: 'Fontanería' }
+      { id: 'tech-1', name: 'Técnico USAC', username: 'user@picks.pro', password: '123', role: 'USAC', status: 'approved', assignedBuildings: BUILDINGS.map(b => b.id), assignedUnits: ['USAC'], phone: '34600000000', specialty: 'Electricidad', isManto: true },
+      { id: 'unit-1', name: 'Técnico GOE III', username: 'unit@picks.pro', password: '123', role: 'GOE3', status: 'approved', assignedBuildings: BUILDINGS.filter(b => b.unit === 'GOE3').map(b => b.id), assignedUnits: ['GOE3'], phone: '34611111111', specialty: 'Fontanería', isManto: true }
     ];
 
     if (!data) {
@@ -328,6 +346,33 @@ export const storageService = {
     const updated = users.map(u => u.id === userId ? { ...u, leaveDays } : u);
     localStorage.setItem(USERS_KEY, JSON.stringify(updated));
     saveToServer();
+  },
+
+  addLeaveEntry: (userId: string, entry: LeaveEntry) => {
+    const users = storageService.getUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex > -1) {
+      const user = users[userIndex];
+      if (!user.leaveEntries) user.leaveEntries = [];
+      user.leaveEntries.push(entry);
+      
+      // Update leaveDays for backward compatibility
+      if (!user.leaveDays) user.leaveDays = [];
+      const start = new Date(entry.startDate);
+      const end = new Date(entry.endDate);
+      const current = new Date(start);
+      while (current <= end) {
+        const dateStr = getLocalDateString(current);
+        if (!user.leaveDays.includes(dateStr)) {
+          user.leaveDays.push(dateStr);
+        }
+        current.setDate(current.getDate() + 1);
+      }
+      
+      users[userIndex] = user;
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+      saveToServer();
+    }
   },
 
   // --- READINGS ---

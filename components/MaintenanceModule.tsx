@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Wrench, Plus, X, Search, LayoutGrid, Info, ArrowLeft, Package, Trash2, ShieldCheck, Clock, Settings, History, Calendar, HardHat, Hammer, Box } from 'lucide-react';
 import { Boiler, User, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, AppTab } from '../types';
 import { storageService, PIEZAS_COMUNES } from '../services/storageService';
+import { getLocalDateString } from '../services/dateUtils';
 
 interface MaintenanceModuleProps {
   user: User;
@@ -55,7 +56,7 @@ const MaintenanceModule: React.FC<MaintenanceModuleProps> = ({ user, onNavigate 
     const record: BoilerMaintenanceRecord = {
       id: crypto.randomUUID(),
       boilerId: selectedBoilerId,
-      date: new Date().toISOString(),
+      date: getLocalDateString(),
       type: form.type,
       title: form.title,
       description: form.description,
@@ -78,7 +79,7 @@ const MaintenanceModule: React.FC<MaintenanceModuleProps> = ({ user, onNavigate 
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-6 pb-24 animate-in fade-in duration-500">
+    <div className="w-full max-w-sm mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
       
       {/* HEADER SECTION */}
       <div className="flex items-center justify-between px-2">

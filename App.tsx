@@ -43,6 +43,36 @@ const App: React.FC = () => {
 
   // Estados para pruebas de notificaciones
   const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registrado', reg))
+        .catch(err => console.error('Error al registrar SW', err));
+    }
+  }, []);
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      alert("Este navegador no soporta notificaciones de escritorio");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    
+    if (permission === 'granted') {
+      new Notification("✅ Notificaciones Activadas", {
+        body: "Ahora recibirás alertas de SIGAI-USAC en este dispositivo.",
+        icon: "https://ais-pre-4jwwkcx7pzgifiy2cotbsm-512452537019.europe-west2.run.app/favicon.ico"
+      });
+    }
+  };
 
   const isMaster = currentUser?.role === 'MASTER';
   const isAuthorized = currentUser?.role === 'USAC' || isMaster;
@@ -68,6 +98,8 @@ const App: React.FC = () => {
 
   const handleTestPush = () => {
     setPushStatus("Simulando envío...");
+    
+    // Notificación interna (en la app)
     setTimeout(() => {
       storageService.addNotification({
         id: crypto.randomUUID(),
@@ -78,6 +110,28 @@ const App: React.FC = () => {
         read: false,
         date: new Date().toISOString()
       });
+
+      // Notificación real del navegador
+      if (notificationPermission === 'granted') {
+        try {
+          const options = {
+            body: 'Las notificaciones del sistema SIGAI funcionan correctamente.',
+            icon: 'https://ais-pre-4jwwkcx7pzgifiy2cotbsm-512452537019.europe-west2.run.app/favicon.ico',
+            vibrate: [200, 100, 200]
+          };
+          
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(registration => {
+              registration.showNotification('🔔 PRUEBA DE PUSH', options);
+            });
+          } else {
+            new Notification('🔔 PRUEBA DE PUSH', options);
+          }
+        } catch (e) {
+          console.error("Error al disparar notificación nativa", e);
+        }
+      }
+
       setPushStatus("✅ ¡Enviado!");
       setTimeout(() => setPushStatus(null), 2000);
     }, 1000);
@@ -309,7 +363,7 @@ const App: React.FC = () => {
     if (activeTab === AppTab.ADMIN && isAuthorized) return <AdminPanel currentUser={currentUser!} />;
     
     if (activeTab === AppTab.SETTINGS && currentUser) return (
-      <div className="p-6 space-y-10 max-w-sm mx-auto w-full pb-32">
+      <div className="p-6 space-y-10 max-w-sm mx-auto w-full pb-12">
          <div>
            <h2 className="text-2xl font-black uppercase tracking-tighter mb-4">Mi Perfil</h2>
            <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-xl flex items-center justify-between">
@@ -381,14 +435,25 @@ const App: React.FC = () => {
                <div className="space-y-4">
                   <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
                      <span className="text-gray-400">Push Notifications</span>
-                     <span className="text-green-500 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Activo</span>
+                     <span className={notificationPermission === 'granted' ? "text-green-500 flex items-center gap-1" : "text-amber-500 flex items-center gap-1"}>
+                        {notificationPermission === 'granted' ? <><CheckCircle className="w-3 h-3" /> Activo</> : <><Info className="w-3 h-3" /> Pendiente</>}
+                     </span>
                   </div>
-                  <button 
-                    onClick={handleTestPush}
-                    className="w-full p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-[1.5rem] text-[9px] font-black uppercase tracking-widest hover:border-yellow-400 transition-all active:scale-95"
-                  >
-                    {pushStatus || "Disparar Push de Prueba"}
-                  </button>
+                   {notificationPermission !== 'granted' && (
+                     <button 
+                       onClick={requestNotificationPermission}
+                       className="w-full p-6 bg-yellow-400 text-black rounded-[1.5rem] text-[9px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all mb-4"
+                     >
+                       Habilitar Notificaciones en este Dispositivo
+                     </button>
+                   )}
+
+                   <button 
+                     onClick={handleTestPush}
+                     className="w-full p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-[1.5rem] text-[9px] font-black uppercase tracking-widest hover:border-yellow-400 transition-all active:scale-95"
+                   >
+                     {pushStatus || "Disparar Push de Prueba"}
+                   </button>
                </div>
 
                <div className="space-y-4">

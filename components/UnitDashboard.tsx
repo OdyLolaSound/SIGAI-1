@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { AppTab, User, ServiceType, Building, Role, UrgencyLevel } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
+import { getLocalDateString } from '../services/dateUtils';
 
 interface UnitDashboardProps {
   user: User;
@@ -31,12 +32,24 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
   const mediumRequests = requests.filter(r => (r.urgency === 'Alta' || r.urgency === 'Media') && r.status !== 'closed').length;
   
   const activeTechs = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
     return team.filter(u => 
       u.status === 'approved' && 
       u.isManto && 
       (!u.leaveDays || !u.leaveDays.includes(today))
     ).length;
+  }, [team]);
+
+  const techniciansOnLeave = useMemo(() => {
+    const today = getLocalDateString();
+    return team.filter(u => 
+      u.status === 'approved' && 
+      u.isManto && 
+      u.leaveDays?.includes(today)
+    ).map(u => {
+      const entry = u.leaveEntries?.find(e => today >= e.startDate && today <= e.endDate);
+      return { name: u.name, type: entry?.type };
+    });
   }, [team]);
 
   // Real data for water
@@ -63,7 +76,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
   const isRestricted = !isMaster && user.role !== 'USAC';
   
   return (
-    <div className="w-full max-w-sm mx-auto space-y-10 pb-32 animate-in fade-in duration-500">
+    <div className="w-full max-w-sm mx-auto space-y-10 pb-12 animate-in fade-in duration-500">
       
       {/* HEADER UNIDAD */}
       <div className="relative overflow-hidden bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
@@ -191,6 +204,20 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
                        <ChevronRight className="w-4 h-4" />
                     </button>
                  </div>
+
+                 {techniciansOnLeave.length > 0 && (
+                   <div className="mb-6 p-4 bg-red-50 rounded-2xl border border-red-100">
+                     <div className="text-[8px] font-black text-red-400 uppercase tracking-widest mb-2">Bajas / Permisos Hoy</div>
+                     <div className="space-y-2">
+                       {techniciansOnLeave.map((tech, i) => (
+                         <div key={i} className="flex justify-between items-center">
+                           <span className="text-[10px] font-black text-gray-900 uppercase">{tech.name}</span>
+                           <span className="text-[8px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-lg uppercase">{tech.type || 'Libre'}</span>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
                  
                  <div className="grid grid-cols-3 gap-3">
                     <StatusBox label="Urgente" val={urgentRequests} color="text-red-600 bg-red-50" />

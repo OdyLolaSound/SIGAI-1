@@ -136,7 +136,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-6 pb-24 animate-in fade-in duration-500">
+    <div className="w-full max-w-sm mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
       
       {/* HEADER SECTION */}
       <div className="flex items-center justify-between px-2">

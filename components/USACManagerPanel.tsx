@@ -241,7 +241,7 @@ const USACManagerPanel: React.FC<USACManagerPanelProps> = ({ currentUser }) => {
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-6 pb-24 animate-in fade-in duration-500">
+    <div className="w-full max-w-sm mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
       <div className="flex items-center justify-between px-2">
         <div>
           <h2 className="text-2xl font-black uppercase tracking-tighter text-gray-900 leading-none">Dashboard USAC</h2>

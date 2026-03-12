@@ -23,7 +23,7 @@ export const parseEuropeanNumber = (val: string | number | null | undefined): nu
 
 export const extractReadingsForService = async (base64Image: string, service: ServiceType): Promise<ReadingResult> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const imagePart = {
       inlineData: {
         mimeType: 'image/jpeg',
@@ -33,11 +33,11 @@ export const extractReadingsForService = async (base64Image: string, service: Se
 
     let instruction = "";
     if (service === 'luz') {
-      instruction = "Analiza este cuadro eléctrico con DOS contadores. Extrae ambas lecturas acumuladas en kWh. Devuelve JSON {v1: num, v2: num}.";
+      instruction = "Analiza este contador o cuadro eléctrico. Extrae la lectura acumulada en kWh. Si hay dos contadores, extrae ambos. Si solo hay uno, pon el segundo como null. Devuelve JSON {v1: num, v2: num | null}.";
     } else if (service === 'agua') {
       instruction = "Analiza este contador de AGUA. Extrae la lectura acumulada en metros cúbicos (m3). Ignora los decimales en rojo si los hay o inclúyelos con coma. Devuelve JSON {v1: num, v2: null}.";
     } else {
-      instruction = "Analiza este panel de CALDERA. Extrae la lectura numérica principal de consumo. Devuelve JSON {v1: num, v2: null}.";
+      instruction = "Analiza este panel de CALDERA o dispositivo de medición. Extrae la lectura numérica principal de consumo. Devuelve JSON {v1: num, v2: null}.";
     }
 
     const response = await ai.models.generateContent({
@@ -82,20 +82,9 @@ export interface MaterialSuggestion {
   }[];
 }
 
-export interface MaterialSuggestion {
-  respuesta: string;
-  materiales: {
-    nombre: string;
-    cantidad: number;
-    unidad: string;
-    categoria: string;
-    descripcion?: string;
-  }[];
-}
-
 export const suggestMaterialsForTask = async (mensaje: string, historial: { role: string, content: string }[]): Promise<MaterialSuggestion> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
     const systemInstruction = `Actúa como un experto en Logística de Mantenimiento de la USAC.
     Tu objetivo es ayudar al usuario a identificar qué materiales necesita para una tarea específica.
@@ -175,7 +164,7 @@ export interface ProviderInfo {
 
 export const extractProviderInfo = async (base64Image: string): Promise<ProviderInfo | null> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const imagePart = {
       inlineData: {
         mimeType: 'image/jpeg',
