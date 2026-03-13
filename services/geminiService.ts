@@ -23,7 +23,8 @@ export const parseEuropeanNumber = (val: string | number | null | undefined): nu
 
 export const extractReadingsForService = async (base64Image: string, service: ServiceType): Promise<ReadingResult> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+    const ai = new GoogleGenAI({ apiKey });
     const imagePart = {
       inlineData: {
         mimeType: 'image/jpeg',
@@ -84,7 +85,8 @@ export interface MaterialSuggestion {
 
 export const suggestMaterialsForTask = async (mensaje: string, historial: { role: string, content: string }[]): Promise<MaterialSuggestion> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+    const ai = new GoogleGenAI({ apiKey });
     
     const systemInstruction = `Actúa como un experto en Logística de Mantenimiento de la USAC.
     Tu objetivo es ayudar al usuario a identificar qué materiales necesita para una tarea específica.
@@ -164,7 +166,8 @@ export interface ProviderInfo {
 
 export const extractProviderInfo = async (base64Image: string): Promise<ProviderInfo | null> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+    const ai = new GoogleGenAI({ apiKey });
     const imagePart = {
       inlineData: {
         mimeType: 'image/jpeg',

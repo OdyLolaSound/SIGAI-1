@@ -223,7 +223,8 @@ const USACManagerPanel: React.FC<USACManagerPanelProps> = ({ currentUser }) => {
   const getStructuralSolution = async (request: RequestItem) => {
     setAiStructuralLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Analiza esta avería recurrente de tipo ${request.category} en la unidad ${request.unit}: "${request.description}".

@@ -12,6 +12,7 @@ interface TeamPanelProps {
 const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
   const [allUsers, setAllUsers] = useState<User[]>(() => storageService.getUsers());
   const [managingTech, setManagingTech] = useState<User | null>(null);
+  const [isGeneralCalendar, setIsGeneralCalendar] = useState(false);
   const [requestingLeaveTech, setRequestingLeaveTech] = useState<User | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const today = getLocalDateString();
@@ -41,7 +42,10 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
         </div>
         {(currentUser.role === 'MASTER' || currentUser.role === 'USAC') && (
           <button 
-            onClick={() => setManagingTech(mantoTechs[0] || currentUser)}
+            onClick={() => {
+              setIsGeneralCalendar(true);
+              setManagingTech(mantoTechs[0] || currentUser);
+            }}
             className="p-4 bg-gray-900 text-yellow-400 rounded-2xl shadow-xl active:scale-95 transition-all flex flex-col items-center gap-1"
           >
             <Calendar className="w-5 h-5" />
@@ -53,7 +57,10 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
       {/* Acceso Rápido Calendario Global */}
       <div className="px-2 space-y-4">
         <button 
-          onClick={() => setManagingTech(mantoTechs[0] || currentUser)}
+          onClick={() => {
+            setIsGeneralCalendar(true);
+            setManagingTech(mantoTechs[0] || currentUser);
+          }}
           className="w-full p-6 bg-white border-2 border-gray-100 rounded-[2rem] shadow-sm flex items-center justify-between group hover:border-yellow-400 transition-all"
         >
           <div className="flex items-center gap-4">
@@ -111,7 +118,10 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <button 
-                        onClick={() => setManagingTech(tech)}
+                        onClick={() => {
+                          setIsGeneralCalendar(false);
+                          setManagingTech(tech);
+                        }}
                         className="font-black text-sm uppercase truncate hover:text-yellow-500 transition-colors"
                       >
                         {tech.name}
@@ -178,6 +188,8 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
       {managingTech && (
         <AvailabilityModal 
           tech={managingTech} 
+          isGeneral={isGeneralCalendar}
+          allTechs={allUsers.filter(u => u.isManto && u.status === 'approved')}
           onClose={() => setManagingTech(null)} 
           onUpdate={handleUpdateLeaveDays}
           onRequestLeave={() => setRequestingLeaveTech(managingTech)}
@@ -332,6 +344,8 @@ const CreateTechModal: React.FC<CreateTechModalProps> = ({ onClose, onCreated })
 
 interface AvailabilityModalProps {
   tech: User;
+  isGeneral: boolean;
+  allTechs: User[];
   onClose: () => void;
   onUpdate: (userId: string, leaveDays: string[]) => void;
   onRequestLeave: () => void;
@@ -358,7 +372,7 @@ const ALICANTE_HOLIDAYS_2026 = [
   '2026-12-25', // Navidad
 ];
 
-const AvailabilityModal: React.FC<AvailabilityModalProps> = ({ tech, onClose, onUpdate, onRequestLeave }) => {
+const AvailabilityModal: React.FC<AvailabilityModalProps> = ({ tech, isGeneral, allTechs, onClose, onUpdate, onRequestLeave }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const leaveDays = tech.leaveDays || [];
 
@@ -396,19 +410,25 @@ const AvailabilityModal: React.FC<AvailabilityModalProps> = ({ tech, onClose, on
               {tech.name.charAt(0)}
             </div>
             <div>
-              <h3 className="text-xl font-black uppercase tracking-tight leading-none">{tech.name}</h3>
+              <h3 className="text-xl font-black uppercase tracking-tight leading-none">
+                {isGeneral ? 'Calendario Laboral General' : tech.name}
+              </h3>
               <p className="text-[9px] text-yellow-400 font-bold uppercase tracking-widest mt-1">Calendario Laboral Alicante</p>
             </div>
           </div>
           <p className="text-[10px] text-white/60 font-medium leading-relaxed">
-            Gestiona la disponibilidad. Los <span className="text-blue-400 font-bold">fines de semana</span> y <span className="text-purple-400 font-bold">festivos</span> están marcados automáticamente.
+            {isGeneral 
+              ? 'Vista general de disponibilidad del equipo USAC.' 
+              : 'Gestiona la disponibilidad. Los fines de semana y festivos están marcados automáticamente.'}
           </p>
-          <button 
-            onClick={onRequestLeave}
-            className="mt-4 w-full p-3 bg-yellow-400 text-black rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all"
-          >
-            <FileText className="w-4 h-4" /> Solicitar Día / Permiso
-          </button>
+          {!isGeneral && (
+            <button 
+              onClick={onRequestLeave}
+              className="mt-4 w-full p-3 bg-yellow-400 text-black rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all"
+            >
+              <FileText className="w-4 h-4" /> Solicitar Día / Permiso
+            </button>
+          )}
         </div>
 
         <div className="p-8">
@@ -442,12 +462,16 @@ const AvailabilityModal: React.FC<AvailabilityModalProps> = ({ tech, onClose, on
               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
               const isHoliday = ALICANTE_HOLIDAYS_2026.includes(dateStr);
 
+              // Check if anyone is on leave for general view
+              const anyoneOnLeave = isGeneral && allTechs.some(u => u.leaveDays?.includes(dateStr));
+
               return (
                 <button 
                   key={dateStr}
-                  onClick={() => toggleDay(dateStr)}
+                  onClick={() => !isGeneral && toggleDay(dateStr)}
+                  disabled={isGeneral}
                   className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-black transition-all active:scale-90 relative ${
-                    isLeave 
+                    !isGeneral && isLeave 
                       ? 'bg-red-500 text-white shadow-lg shadow-red-200' 
                       : isHoliday
                         ? 'bg-purple-100 text-purple-700 border border-purple-200'
@@ -460,6 +484,7 @@ const AvailabilityModal: React.FC<AvailabilityModalProps> = ({ tech, onClose, on
                 >
                   {day.getDate()}
                   {isHoliday && <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full border border-white" />}
+                  {anyoneOnLeave && <div className="absolute bottom-1 w-1 h-1 bg-red-500 rounded-full" />}
                 </button>
               );
             })}
