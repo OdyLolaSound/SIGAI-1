@@ -197,7 +197,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6 flex flex-col items-center">
+      <main className="flex-1 overflow-y-auto overscroll-contain p-6 flex flex-col items-center">
         <div className="w-full max-w-sm space-y-8">
           
           {step === 'INPUT' && (
@@ -337,7 +337,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                   </div>
 
                   {/* Messages Area */}
-                  <div className="flex-1 overflow-y-auto space-y-6 pr-2 scrollbar-hide">
+                  <div className="flex-1 overflow-y-auto overscroll-contain space-y-6 pr-2 scrollbar-hide">
                     <div className="bg-yellow-400/5 border border-yellow-400/10 p-5 rounded-3xl relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400/30"></div>
                       <p className="text-yellow-400 text-[9px] font-black uppercase tracking-widest mb-2 flex items-center gap-2">

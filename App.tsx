@@ -23,14 +23,25 @@ import { Zap, Droplets, Flame, ShieldCheck, ChevronRight, User as UserIcon, LogO
 import { storageService, BUILDINGS } from './services/storageService';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<AppTab>(AppTab.HOME);
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    const saved = localStorage.getItem('sigai_active_tab');
+    return (saved as AppTab) || AppTab.HOME;
+  });
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authRole, setAuthRole] = useState<Role | null>(null);
   
-  const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
-  const [selectedService, setSelectedService] = useState<ServiceType | null>(null);
-  const [unitMenuOpen, setUnitMenuOpen] = useState(false);
+  const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(() => {
+    const saved = localStorage.getItem('sigai_selected_building');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [selectedService, setSelectedService] = useState<ServiceType | null>(() => {
+    const saved = localStorage.getItem('sigai_selected_service');
+    return (saved as ServiceType) || null;
+  });
+  const [unitMenuOpen, setUnitMenuOpen] = useState(() => {
+    return localStorage.getItem('sigai_unit_menu_open') === 'true';
+  });
   const [isSyncing, setIsSyncing] = useState(true);
 
   useEffect(() => {
@@ -73,6 +84,24 @@ const App: React.FC = () => {
       });
     }
   };
+
+  useEffect(() => {
+    localStorage.setItem('sigai_active_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (selectedBuilding) localStorage.setItem('sigai_selected_building', JSON.stringify(selectedBuilding));
+    else localStorage.removeItem('sigai_selected_building');
+  }, [selectedBuilding]);
+
+  useEffect(() => {
+    if (selectedService) localStorage.setItem('sigai_selected_service', selectedService);
+    else localStorage.removeItem('sigai_selected_service');
+  }, [selectedService]);
+
+  useEffect(() => {
+    localStorage.setItem('sigai_unit_menu_open', unitMenuOpen.toString());
+  }, [unitMenuOpen]);
 
   const isMaster = currentUser?.role === 'MASTER';
   const isAuthorized = currentUser?.role === 'USAC' || isMaster;
@@ -376,7 +405,18 @@ const App: React.FC = () => {
                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{currentUser.role}</div>
                  </div>
               </div>
-              <button onClick={() => { setCurrentUser(null); setUnitMenuOpen(false); setSelectedService(null); setActiveTab(AppTab.HOME); }} className="p-4 text-red-500 hover:bg-red-50 rounded-2xl transition-colors">
+              <button onClick={() => { 
+                setCurrentUser(null); 
+                storageService.setCurrentUser(null);
+                setUnitMenuOpen(false); 
+                setSelectedService(null); 
+                setSelectedBuilding(null);
+                setActiveTab(AppTab.HOME); 
+                localStorage.removeItem('sigai_active_tab');
+                localStorage.removeItem('sigai_selected_building');
+                localStorage.removeItem('sigai_selected_service');
+                localStorage.removeItem('sigai_unit_menu_open');
+              }} className="p-4 text-red-500 hover:bg-red-50 rounded-2xl transition-colors">
                 <LogOut />
               </button>
            </div>

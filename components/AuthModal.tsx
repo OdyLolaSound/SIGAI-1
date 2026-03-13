@@ -16,6 +16,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
     name: '',
     username: '',
     password: '',
+    phone: '',
     role: initialRole,
     isManto: false
   });
@@ -68,6 +69,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
       status: 'pending',
       assignedBuildings: [],
       assignedUnits: [],
+      phone: formData.phone,
       isManto: formData.isManto,
       leaveDays: []
     };
@@ -139,12 +141,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
               <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
                 type="text" 
-                placeholder="Nombre de Usuario (Email)" 
+                placeholder="Nombre de Usuario" 
                 className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100"
                 value={formData.username}
                 onChange={e => setFormData({...formData, username: e.target.value})}
               />
             </div>
+
+            {/* Phone field removed to keep registration simple as requested */}
 
             <div className="relative">
               <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -157,25 +161,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
               />
             </div>
 
-            {view === 'register' && (
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-400 rounded-lg">
-                    <Crown className="w-4 h-4 text-black" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase">Técnico Manto</p>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase">Personal de Mantenimiento USAC</p>
-                  </div>
-                </div>
-                <input 
-                  type="checkbox" 
-                  className="w-5 h-5 rounded-lg border-gray-300 text-gray-900 focus:ring-gray-900"
-                  checked={formData.isManto}
-                  onChange={e => setFormData({...formData, isManto: e.target.checked})}
-                />
-              </div>
-            )}
+            {/* isManto checkbox removed to keep registration simple as requested */}
 
             <button type="submit" className="w-full p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 mt-4 hover:bg-black">
               {view === 'login' ? 'Entrar' : 'Registrarse'} <ChevronRight className="w-4 h-4 text-yellow-400" />

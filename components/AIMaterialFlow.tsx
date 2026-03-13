@@ -362,7 +362,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
+      <main className="flex-1 overflow-y-auto overscroll-contain p-4 md:p-6 flex flex-col items-center">
         <div className="w-full max-w-2xl">
           
           {/* STEP 1: INICIO */}
@@ -621,7 +621,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Asistente IA</span>
                 <div className="w-9" />
               </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-6">
                 <div className="flex gap-4">
                   <div className="w-10 h-10 bg-blue-100 rounded-2xl flex items-center justify-center shrink-0">🤖</div>
                   <div className="bg-blue-50 p-6 rounded-[2rem] rounded-tl-none space-y-3 max-w-[85%]">

@@ -26,6 +26,7 @@ const BOILER_MAINTENANCE_KEY = 'sigai_boiler_maintenance_v1';
 
 const PROVIDERS_KEY = 'sigai_providers_v1';
 const CATEGORIES_KEY = 'sigai_categories_v1';
+const CURRENT_USER_KEY = 'sigai_current_user_v1';
 
 // --- SERVER SYNC HELPERS ---
 const API_BASE = '/api';
@@ -37,7 +38,16 @@ async function fetchFromServer() {
       const data = await res.json();
       // Sync to localStorage
       if (data.readings) localStorage.setItem(READINGS_KEY, JSON.stringify(data.readings));
-      if (data.users) localStorage.setItem(USERS_KEY, JSON.stringify(data.users));
+      if (data.users && data.users.length > 0) {
+        const localUsers = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+        // Only overwrite if server has more data or local is empty
+        if (localUsers.length <= 1 || data.users.length > localUsers.length) {
+          localStorage.setItem(USERS_KEY, JSON.stringify(data.users));
+        } else if (localUsers.length > data.users.length) {
+          // If local has more, push local to server
+          saveToServer();
+        }
+      }
       if (data.requests) localStorage.setItem(REQUESTS_KEY, JSON.stringify(data.requests));
       if (data.gasoil_tanks) localStorage.setItem(GASOIL_TANKS_KEY, JSON.stringify(data.gasoil_tanks));
       if (data.gasoil_readings) localStorage.setItem(GASOIL_READINGS_KEY, JSON.stringify(data.gasoil_readings));
@@ -293,9 +303,7 @@ export const storageService = {
   getUsers: (): User[] => {
     const data = localStorage.getItem(USERS_KEY);
     const initial: User[] = [
-      { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] },
-      { id: 'tech-1', name: 'Técnico USAC', username: 'user@picks.pro', password: '123', role: 'USAC', status: 'approved', assignedBuildings: BUILDINGS.map(b => b.id), assignedUnits: ['USAC'], phone: '34600000000', specialty: 'Electricidad', isManto: true },
-      { id: 'unit-1', name: 'Técnico GOE III', username: 'unit@picks.pro', password: '123', role: 'GOE3', status: 'approved', assignedBuildings: BUILDINGS.filter(b => b.unit === 'GOE3').map(b => b.id), assignedUnits: ['GOE3'], phone: '34611111111', specialty: 'Fontanería', isManto: true }
+      { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] }
     ];
 
     if (!data) {
@@ -323,6 +331,13 @@ export const storageService = {
   saveUser: (user: User) => {
     const users = storageService.getUsers();
     const updated = [...users, user];
+    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
+    saveToServer();
+  },
+
+  updateUser: (user: User) => {
+    const users = storageService.getUsers();
+    const updated = users.map(u => u.id === user.id ? user : u);
     localStorage.setItem(USERS_KEY, JSON.stringify(updated));
     saveToServer();
   },
@@ -891,5 +906,24 @@ export const storageService = {
       (query.email && p.email && p.email.toLowerCase() === query.email.toLowerCase()) ||
       (query.phone && p.phone && p.phone.replace(/\s/g, '') === query.phone.replace(/\s/g, ''))
     ) || null;
+  },
+
+  // --- SESSION MANAGEMENT ---
+  setCurrentUser: (user: User | null) => {
+    if (user) {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(CURRENT_USER_KEY);
+    }
+  },
+
+  getCurrentUser: (): User | null => {
+    const data = localStorage.getItem(CURRENT_USER_KEY);
+    if (!data) return null;
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      return null;
+    }
   }
 };

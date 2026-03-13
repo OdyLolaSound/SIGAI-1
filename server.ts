@@ -6,9 +6,7 @@ import path from "path";
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
 const DEFAULT_USERS = [
-  { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] },
-  { id: 'tech-1', name: 'Técnico USAC', username: 'user@picks.pro', password: '123', role: 'USAC', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC'], phone: '34600000000', specialty: 'Electricidad' },
-  { id: 'unit-1', name: 'Técnico GOE III', username: 'unit@picks.pro', password: '123', role: 'GOE3', status: 'approved', assignedBuildings: [], assignedUnits: ['GOE3'], phone: '34611111111', specialty: 'Fontanería' }
+  { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] }
 ];
 
 // Helper to read/write data
