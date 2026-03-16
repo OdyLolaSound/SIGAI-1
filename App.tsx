@@ -21,13 +21,16 @@ import WaterSyncModule from './components/WaterSyncModule';
 import { AppTab, ServiceType, Building, User, Role } from './types';
 import { Zap, Droplets, Flame, ShieldCheck, ChevronRight, User as UserIcon, LogOut, Crown, PlusCircle, LayoutGrid, UserPlus, MessageSquare, Package, ClipboardList, Calendar, Users, Bell, Phone, CheckCircle, Info } from 'lucide-react';
 import { storageService, BUILDINGS } from './services/storageService';
+import { auth, db } from './firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     const saved = localStorage.getItem('sigai_active_tab');
     return (saved as AppTab) || AppTab.HOME;
   });
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(storageService.getCurrentUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authRole, setAuthRole] = useState<Role | null>(null);
   
@@ -47,9 +50,56 @@ const App: React.FC = () => {
   useEffect(() => {
     const initSync = async () => {
       await storageService.init();
-      setIsSyncing(false);
+      // After storage init, we wait for auth state
     };
     initSync();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        storageService.startListeners();
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            setCurrentUser(userData);
+            storageService.setCurrentUser(userData);
+          } else {
+            // If it's the master admin (email check)
+            if (firebaseUser.email === 'JCYebenes@gmail.com') {
+              const masterUser: User = {
+                id: firebaseUser.uid,
+                name: 'Administrador Maestro',
+                username: 'admin',
+                password: '', // No password needed for OAuth/Firebase Auth
+                role: 'MASTER',
+                status: 'approved',
+                assignedBuildings: BUILDINGS.map(b => b.id),
+                assignedUnits: ['USAC', 'GCG', 'BOEL', 'GOE4'],
+                isManto: true,
+                leaveDays: []
+              };
+              await storageService.saveUser(masterUser);
+              setCurrentUser(masterUser);
+              storageService.setCurrentUser(masterUser);
+            } else {
+              await signOut(auth);
+              setCurrentUser(null);
+              storageService.setCurrentUser(null);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        }
+      } else {
+        storageService.stopListeners();
+        setCurrentUser(null);
+        storageService.setCurrentUser(null);
+      }
+      setIsSyncing(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   // Estados para pruebas de notificaciones
@@ -84,6 +134,23 @@ const App: React.FC = () => {
       });
     }
   };
+
+  useEffect(() => {
+    // Reset to HOME if state is inconsistent (e.g. requires user but no user)
+    const authRequiredTabs = [
+      AppTab.CALENDAR, AppTab.TEAM, AppTab.AI_REQUEST, AppTab.AI_MATERIAL, 
+      AppTab.USAC_MANAGER, AppTab.GASOIL, AppTab.BOILERS, AppTab.SALT, 
+      AppTab.TEMPERATURES, AppTab.MAINTENANCE, AppTab.WATER_SYNC
+    ];
+    
+    if (!currentUser && authRequiredTabs.includes(activeTab)) {
+      setActiveTab(AppTab.HOME);
+    }
+    
+    if (!currentUser && unitMenuOpen) {
+      setUnitMenuOpen(false);
+    }
+  }, [currentUser, activeTab, unitMenuOpen]);
 
   useEffect(() => {
     localStorage.setItem('sigai_active_tab', activeTab);
@@ -199,6 +266,20 @@ const App: React.FC = () => {
     setUnitMenuOpen(false);
     setSelectedService(null);
     setSelectedBuilding(null);
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setCurrentUser(null);
+    storageService.setCurrentUser(null);
+    setActiveTab(AppTab.HOME);
+    setSelectedService(null);
+    setSelectedBuilding(null);
+    setUnitMenuOpen(false);
+    localStorage.removeItem('sigai_active_tab');
+    localStorage.removeItem('sigai_selected_building');
+    localStorage.removeItem('sigai_selected_service');
+    localStorage.removeItem('sigai_unit_menu_open');
   };
 
   const handleBack = () => {
@@ -389,7 +470,7 @@ const App: React.FC = () => {
       if (activeTab === AppTab.SCAN) return <Scanner serviceType={selectedService} building={selectedBuilding} user={currentUser!} onComplete={() => setActiveTab(AppTab.DASHBOARD)} />;
     }
 
-    if (activeTab === AppTab.ADMIN && isAuthorized) return <AdminPanel currentUser={currentUser!} />;
+    if (activeTab === AppTab.ADMIN && isAuthorized && currentUser) return <AdminPanel currentUser={currentUser} />;
     
     if (activeTab === AppTab.SETTINGS && currentUser) return (
       <div className="p-6 space-y-10 max-w-sm mx-auto w-full pb-12">
@@ -405,18 +486,7 @@ const App: React.FC = () => {
                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{currentUser.role}</div>
                  </div>
               </div>
-              <button onClick={() => { 
-                setCurrentUser(null); 
-                storageService.setCurrentUser(null);
-                setUnitMenuOpen(false); 
-                setSelectedService(null); 
-                setSelectedBuilding(null);
-                setActiveTab(AppTab.HOME); 
-                localStorage.removeItem('sigai_active_tab');
-                localStorage.removeItem('sigai_selected_building');
-                localStorage.removeItem('sigai_selected_service');
-                localStorage.removeItem('sigai_unit_menu_open');
-              }} className="p-4 text-red-500 hover:bg-red-50 rounded-2xl transition-colors">
+              <button onClick={handleLogout} className="p-4 text-red-500 hover:bg-red-50 rounded-2xl transition-colors">
                 <LogOut />
               </button>
            </div>
@@ -522,7 +592,41 @@ const App: React.FC = () => {
       </div>
     );
 
-    return null;
+    // FALLBACK: If we are here and nothing matched, show the main unit selection
+    return (
+      <div className="flex flex-col items-center w-full py-6 animate-in fade-in zoom-in-95 max-w-sm mx-auto">
+        <div className="text-center mb-8 px-4">
+          <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase mb-1">SIGAI-USAC</h2>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.4em]">Gestión de Instalaciones</p>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 w-full px-2">
+          {(!currentUser || currentUser.assignedUnits?.includes('USAC')) && <UnitButton icon="🏢" label='USAC "Rojas Navarrete"' onClick={() => handleUnitClick('USAC')} full />}
+          {(!currentUser || currentUser.assignedUnits?.includes('CG')) && <UnitButton icon="🏛️" label="Cuartel General" onClick={() => handleUnitClick('CG')} />}
+          {(!currentUser || currentUser.assignedUnits?.includes('GCG')) && <UnitButton icon="👥" label="Grupo C. General" onClick={() => handleUnitClick('GCG')} />}
+          {(!currentUser || currentUser.assignedUnits?.includes('GOE3')) && <UnitButton icon="⚔️" label="GOE III" onClick={() => handleUnitClick('GOE3')} />}
+          {(!currentUser || currentUser.assignedUnits?.includes('GOE4')) && <UnitButton icon="⚔️" label="GOE IV" onClick={() => handleUnitClick('GOE4')} />}
+          {(!currentUser || currentUser.assignedUnits?.includes('BOEL')) && <UnitButton icon="🦅" label="BOEL XIX" onClick={() => handleUnitClick('BOEL')} />}
+          {(!currentUser || currentUser.assignedUnits?.includes('UMOE')) && <UnitButton icon="🎖️" label="UMOE" onClick={() => handleUnitClick('UMOE')} />}
+          {(!currentUser || currentUser.assignedUnits?.includes('CECOM')) && <UnitButton icon="📡" label="CECOM" onClick={() => handleUnitClick('CECOM')} />}
+        </div>
+
+        <div className="w-full px-2 mt-8 space-y-4">
+          <button 
+            onClick={() => { setAuthRole('USAC'); setShowAuthModal(true); }}
+            className="w-full p-6 bg-white border-2 border-gray-900 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[11px] shadow-lg flex items-center justify-center gap-4 active:scale-95 transition-all"
+          >
+            <UserPlus className="w-5 h-5" /> Solicitar Registro / Alta Técnico
+          </button>
+
+          {isAuthorized && (
+            <button onClick={() => setActiveTab(AppTab.ADMIN)} className="w-full p-6 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all">
+              <ShieldCheck className="w-5 h-5" /> {isMaster ? 'Control Maestro SIGAI' : 'Panel Gestión USAC'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (

@@ -1,113 +1,10 @@
 
 import { Reading, Building, ServiceType, Role, User, UserStatus, RequestItem, GasoilTank, Boiler, BoilerTemperatureReading, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, SaltWarehouse, SaltSoftener, CalendarTask, AppNotification, GasoilReading, RefuelRequest, SaltRefillLog, SaltEntryLog, ExternalUser, WaterAccount, WaterSyncLog, GasoilAlertStatus, Provider, MaterialCategory, MaterialItem, LeaveEntry } from '../types';
 import { getLocalDateString } from './dateUtils';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { collection, doc, setDoc, getDocs, onSnapshot, query, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 
-const READINGS_KEY = 'sigai_readings_v5';
-const USERS_KEY = 'sigai_users_v5';
-const REQUESTS_KEY = 'sigai_requests_v5';
-const GASOIL_TANKS_KEY = 'sigai_gasoil_tanks_v1';
-const GASOIL_READINGS_KEY = 'sigai_gasoil_readings_v1';
-const REFUEL_REQUESTS_KEY = 'sigai_refuel_requests_v1';
-const SALT_STOCK_KEY = 'sigai_salt_stock_v2';
-const SALT_SOFTENERS_KEY = 'sigai_salt_softeners_v2';
-const SALT_REFILL_LOGS_KEY = 'sigai_salt_refill_logs_v1';
-const SALT_ENTRY_LOGS_KEY = 'sigai_salt_entry_logs_v1';
-const WATER_ACCOUNTS_KEY = 'sigai_water_accounts_v2';
-const WATER_SYNC_LOGS_KEY = 'sigai_water_sync_logs_v2';
-
-const TASKS_KEY = 'sigai_tasks_v1';
-const NOTIFICATIONS_KEY = 'sigai_notifications_v1';
-const EXTERNAL_CONTACTS_KEY = 'sigai_external_contacts_v1';
-
-// NEW KEYS
-const BOILERS_KEY = 'sigai_boilers_v1';
-const BOILER_READINGS_KEY = 'sigai_boiler_readings_v1';
-const BOILER_MAINTENANCE_KEY = 'sigai_boiler_maintenance_v1';
-
-const PROVIDERS_KEY = 'sigai_providers_v1';
-const CATEGORIES_KEY = 'sigai_categories_v1';
-const CURRENT_USER_KEY = 'sigai_current_user_v1';
-
-// --- SERVER SYNC HELPERS ---
-const API_BASE = '/api';
-
-async function fetchFromServer() {
-  try {
-    const res = await fetch(`${API_BASE}/data`);
-    if (res.ok) {
-      const data = await res.json();
-      // Sync to localStorage
-      if (data.readings) localStorage.setItem(READINGS_KEY, JSON.stringify(data.readings));
-      if (data.users && data.users.length > 0) {
-        const localUsers = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-        // Only overwrite if server has more data or local is empty
-        if (localUsers.length <= 1 || data.users.length > localUsers.length) {
-          localStorage.setItem(USERS_KEY, JSON.stringify(data.users));
-        } else if (localUsers.length > data.users.length) {
-          // If local has more, push local to server
-          saveToServer();
-        }
-      }
-      if (data.requests) localStorage.setItem(REQUESTS_KEY, JSON.stringify(data.requests));
-      if (data.gasoil_tanks) localStorage.setItem(GASOIL_TANKS_KEY, JSON.stringify(data.gasoil_tanks));
-      if (data.gasoil_readings) localStorage.setItem(GASOIL_READINGS_KEY, JSON.stringify(data.gasoil_readings));
-      if (data.refuel_requests) localStorage.setItem(REFUEL_REQUESTS_KEY, JSON.stringify(data.refuel_requests));
-      if (data.salt_stock) localStorage.setItem(SALT_STOCK_KEY, JSON.stringify(data.salt_stock));
-      if (data.salt_softeners) localStorage.setItem(SALT_SOFTENERS_KEY, JSON.stringify(data.salt_softeners));
-      if (data.salt_refill_logs) localStorage.setItem(SALT_REFILL_LOGS_KEY, JSON.stringify(data.salt_refill_logs));
-      if (data.salt_entry_logs) localStorage.setItem(SALT_ENTRY_LOGS_KEY, JSON.stringify(data.salt_entry_logs));
-      if (data.water_accounts) localStorage.setItem(WATER_ACCOUNTS_KEY, JSON.stringify(data.water_accounts));
-      if (data.water_sync_logs) localStorage.setItem(WATER_SYNC_LOGS_KEY, JSON.stringify(data.water_sync_logs));
-      if (data.tasks) localStorage.setItem(TASKS_KEY, JSON.stringify(data.tasks));
-      if (data.notifications) localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(data.notifications));
-      if (data.external_contacts) localStorage.setItem(EXTERNAL_CONTACTS_KEY, JSON.stringify(data.external_contacts));
-      if (data.boilers) localStorage.setItem(BOILERS_KEY, JSON.stringify(data.boilers));
-      if (data.boiler_readings) localStorage.setItem(BOILER_READINGS_KEY, JSON.stringify(data.boiler_readings));
-      if (data.boiler_maintenance) localStorage.setItem(BOILER_MAINTENANCE_KEY, JSON.stringify(data.boiler_maintenance));
-      if (data.providers) localStorage.setItem(PROVIDERS_KEY, JSON.stringify(data.providers));
-      if (data.categories) localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data.categories));
-      return true;
-    }
-  } catch (e) {
-    console.error("Sync error:", e);
-  }
-  return false;
-}
-
-async function saveToServer() {
-  try {
-    const data = {
-      readings: JSON.parse(localStorage.getItem(READINGS_KEY) || '[]'),
-      users: JSON.parse(localStorage.getItem(USERS_KEY) || '[]'),
-      requests: JSON.parse(localStorage.getItem(REQUESTS_KEY) || '[]'),
-      gasoil_tanks: JSON.parse(localStorage.getItem(GASOIL_TANKS_KEY) || '[]'),
-      gasoil_readings: JSON.parse(localStorage.getItem(GASOIL_READINGS_KEY) || '[]'),
-      refuel_requests: JSON.parse(localStorage.getItem(REFUEL_REQUESTS_KEY) || '[]'),
-      salt_stock: JSON.parse(localStorage.getItem(SALT_STOCK_KEY) || 'null'),
-      salt_softeners: JSON.parse(localStorage.getItem(SALT_SOFTENERS_KEY) || '[]'),
-      salt_refill_logs: JSON.parse(localStorage.getItem(SALT_REFILL_LOGS_KEY) || '[]'),
-      salt_entry_logs: JSON.parse(localStorage.getItem(SALT_ENTRY_LOGS_KEY) || '[]'),
-      water_accounts: JSON.parse(localStorage.getItem(WATER_ACCOUNTS_KEY) || '[]'),
-      water_sync_logs: JSON.parse(localStorage.getItem(WATER_SYNC_LOGS_KEY) || '[]'),
-      tasks: JSON.parse(localStorage.getItem(TASKS_KEY) || '[]'),
-      notifications: JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY) || '[]'),
-      external_contacts: JSON.parse(localStorage.getItem(EXTERNAL_CONTACTS_KEY) || '[]'),
-      boilers: JSON.parse(localStorage.getItem(BOILERS_KEY) || '[]'),
-      boiler_readings: JSON.parse(localStorage.getItem(BOILER_READINGS_KEY) || '[]'),
-      boiler_maintenance: JSON.parse(localStorage.getItem(BOILER_MAINTENANCE_KEY) || '[]'),
-      providers: JSON.parse(localStorage.getItem(PROVIDERS_KEY) || '[]'),
-      categories: JSON.parse(localStorage.getItem(CATEGORIES_KEY) || '[]'),
-    };
-    await fetch(`${API_BASE}/save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  } catch (e) {
-    console.error("Save error:", e);
-  }
-}
-
+// Constants that don't change
 export const BUILDINGS: Building[] = [
   { id: 'E0007', name: 'Vestuario de Mandos', code: 'E0007', unit: 'USAC', hasBoiler: true },
   { id: 'E0010', name: 'Vestuario GCG y GOE III', code: 'E0010', unit: 'GCG', hasBoiler: true },
@@ -119,11 +16,9 @@ export const BUILDINGS: Building[] = [
   { id: 'E0068', name: 'Alojamiento Tropa A', code: 'E0068', unit: 'USAC', hasBoiler: true },
   { id: 'CT_1_2', name: 'Centro de transformación 1 y 2', code: 'CT12', unit: 'USAC', hasBoiler: false },
   { id: 'CT_3', name: 'Centro de transformación 3', code: 'CT3', unit: 'USAC', hasBoiler: false },
+  { id: 'BASE_ALICANTE', name: 'Base Alicante (Contador General)', code: 'ALC-GEN', unit: 'USAC', hasBoiler: false },
 ];
 
-/**
- * Common boiler parts used in the maintenance module
- */
 export const PIEZAS_COMUNES: BoilerPart[] = [
   { id: 'p1', name: 'Fotocélula QRB1', category: 'Electrónica', price: 45.50 },
   { id: 'p2', name: 'Boquilla Danfoss 0.60', category: 'Combustión', price: 12.80 },
@@ -132,798 +27,524 @@ export const PIEZAS_COMUNES: BoilerPart[] = [
   { id: 'p5', name: 'Termostato Inmersión', category: 'Control', price: 22.00 }
 ];
 
+// Local cache for synchronous access (updated by real-time listeners)
+let cache: any = {
+  readings: [],
+  users: [],
+  requests: [],
+  gasoil_tanks: [],
+  gasoil_readings: [],
+  refuel_requests: [],
+  salt_stock: null,
+  salt_softeners: [],
+  salt_refill_logs: [],
+  salt_entry_logs: [],
+  water_accounts: [],
+  water_sync_logs: [],
+  tasks: [],
+  notifications: [],
+  external_contacts: [],
+  boilers: [],
+  boiler_readings: [],
+  boiler_maintenance: [],
+  providers: [],
+  categories: []
+};
+
+let activeListeners: (() => void)[] = [];
+
+// Helper to initialize a collection listener
+function setupListener(collectionName: string, cacheKey: string) {
+  const q = query(collection(db, collectionName));
+  return onSnapshot(q, (snapshot) => {
+    const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+    if (cacheKey === 'salt_stock') {
+      cache[cacheKey] = data[0] || null;
+    } else {
+      cache[cacheKey] = data;
+    }
+  }, (error) => {
+    // Only log if it's not a permission error during logout/login transition
+    if (!error.message.includes('insufficient permissions')) {
+      handleFirestoreError(error, OperationType.LIST, collectionName);
+    }
+  });
+}
+
 export const storageService = {
-  // --- SYNC ---
   init: async () => {
-    const users = storageService.getUsers();
-    let changed = false;
-    const updated = users.map(u => {
-      if ((u.id === 'tech-1' || u.id === 'unit-1') && !u.isManto) {
-        changed = true;
-        return { ...u, isManto: true };
-      }
-      return u;
+    // init is now a placeholder, listeners are started via startListeners()
+    return true;
+  },
+
+  startListeners: () => {
+    if (activeListeners.length > 0) return;
+
+    activeListeners = [
+      setupListener('readings', 'readings'),
+      setupListener('users', 'users'),
+      setupListener('requests', 'requests'),
+      setupListener('gasoil_tanks', 'gasoil_tanks'),
+      setupListener('gasoil_readings', 'gasoil_readings'),
+      setupListener('refuel_requests', 'refuel_requests'),
+      setupListener('salt_stock', 'salt_stock'),
+      setupListener('salt_softeners', 'salt_softeners'),
+      setupListener('salt_refill_logs', 'salt_refill_logs'),
+      setupListener('salt_entry_logs', 'salt_entry_logs'),
+      setupListener('water_accounts', 'water_accounts'),
+      setupListener('water_sync_logs', 'water_sync_logs'),
+      setupListener('tasks', 'tasks'),
+      setupListener('notifications', 'notifications'),
+      setupListener('external_contacts', 'external_contacts'),
+      setupListener('boilers', 'boilers'),
+      setupListener('boiler_readings', 'boiler_readings'),
+      setupListener('boiler_maintenance', 'boiler_maintenance'),
+      setupListener('providers', 'providers'),
+      setupListener('categories', 'categories'),
+    ];
+  },
+
+  stopListeners: () => {
+    activeListeners.forEach(unsubscribe => unsubscribe());
+    activeListeners = [];
+    // Clear cache on logout to prevent stale data flash
+    Object.keys(cache).forEach(key => {
+      if (key === 'salt_stock') cache[key] = null;
+      else cache[key] = [];
     });
-    if (changed) {
-      localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-    }
-    return await fetchFromServer();
   },
 
-  // --- WATER TELEMETRY (CUENTA ÚNICA) ---
-  getWaterAccount: (): WaterAccount => {
-    const data = localStorage.getItem(WATER_ACCOUNTS_KEY);
-    if (!data) {
-      const initial: WaterAccount = {
-        id: 'main-water-account',
-        buildingId: 'BASE_ALICANTE',
-        buildingCode: 'BASE',
-        buildingName: 'Contador General Red Principal',
-        contractNumber: 'S0300017A',
-        webUser: 'S0300017A',
-        syncActive: true,
-        status: 'conectada',
-        peakThresholdPercent: 50,
-        peakThresholdM3: 15,
-        syncFrequency: 'diaria',
-        selectors: {
-          userField: 'input[name*="user" i]',
-          passField: 'input[type="password"]',
-          submitBtn: 'button[type="submit"]',
-          tableSelector: 'table'
-        }
-      };
-      localStorage.setItem(WATER_ACCOUNTS_KEY, JSON.stringify([initial]));
-      return initial;
-    }
-    return JSON.parse(data)[0];
+  // --- READINGS ---
+  getReadings: (buildingId?: string, serviceType?: ServiceType): Reading[] => {
+    let readings = cache.readings;
+    if (buildingId) readings = readings.filter((r: any) => r.buildingId === buildingId);
+    if (serviceType) readings = readings.filter((r: any) => r.serviceType === serviceType);
+    return readings;
   },
-
-  saveWaterAccount: (account: WaterAccount) => {
-    localStorage.setItem(WATER_ACCOUNTS_KEY, JSON.stringify([account]));
-    saveToServer();
-  },
-
-  getWaterSyncLogs: (): WaterSyncLog[] => {
-    const data = localStorage.getItem(WATER_SYNC_LOGS_KEY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  simulateWaterSync: async (accountId: string, onStep?: (msg: string) => void): Promise<{ success: boolean, reading?: Reading, message: string }> => {
-    const account = storageService.getWaterAccount();
-    const startTime = Date.now();
-    const debugSteps: string[] = [];
-
-    const logStep = (msg: string) => {
-      debugSteps.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
-      if (onStep) onStep(msg);
-    };
-
-    logStep("Iniciando Puppeteer Headless Engine...");
-    await new Promise(r => setTimeout(r, 800));
-    
-    logStep("🔍 ETAPA 1: Buscando página de login...");
-    logStep("Probando URL: https://www.aguasdealicante.es/acceso-area-privada");
-    await new Promise(r => setTimeout(r, 1200));
-
-    logStep("🔍 ETAPA 2: Analizando formulario de login...");
-    await new Promise(r => setTimeout(r, 600));
-
-    logStep("🔍 ETAPA 3: Identificando selectores...");
-    logStep(`Selector usuario: ${account.selectors?.userField || 'auto'}`);
-    logStep(`Selector password: ${account.selectors?.passField || 'auto'}`);
-    await new Promise(r => setTimeout(r, 500));
-
-    logStep("🔍 ETAPA 4: Intentando login...");
-    logStep(`Enviando credenciales para usuario: ${account.webUser}`);
-    await new Promise(r => setTimeout(r, 1000));
-
+  saveReading: async (reading: Reading) => {
     try {
-      logStep("🔍 ETAPA 5: Buscando sección de consumos...");
-      logStep("Extrayendo tabla de datos...");
-      await new Promise(r => setTimeout(r, 800));
-
-      const readings = storageService.getReadings('BASE_ALICANTE', 'agua');
-      const lastReading = readings.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-      
-      const prevValue = lastReading?.value1 || 12450;
-      const consumption = Math.floor(Math.random() * 20) + 2; 
-      const newValue = prevValue + consumption;
-
-      const last30Days = readings.filter(r => {
-        const diff = Date.now() - new Date(r.date).getTime();
-        return diff < (30 * 24 * 60 * 60 * 1000);
-      });
-      const avgConsumption = last30Days.length > 0 
-        ? last30Days.reduce((sum, r) => sum + (r.consumption1 || 0), 0) / last30Days.length 
-        : 8.5;
-
-      const percentOverAvg = ((consumption - avgConsumption) / avgConsumption) * 100;
-      const isPeak = percentOverAvg > account.peakThresholdPercent || consumption > account.peakThresholdM3;
-
-      const newReading: Reading = {
-        id: crypto.randomUUID(),
-        buildingId: 'BASE_ALICANTE',
-        date: getLocalDateString(),
-        timestamp: new Date().toISOString(),
-        userId: 'system_bot',
-        serviceType: 'agua',
-        origin: 'telematica',
-        value1: newValue,
-        consumption1: consumption,
-        isPeak,
-        peakPercentage: percentOverAvg
-      };
-
-      storageService.saveReading(newReading);
-      
-      account.lastSync = new Date().toISOString();
-      account.status = 'conectada';
-      storageService.saveWaterAccount(account);
-
-      logStep("✅ Sincronización completada con éxito.");
-
-      const log: WaterSyncLog = {
-        id: crypto.randomUUID(),
-        accountId,
-        date: new Date().toISOString(),
-        status: 'exito',
-        readingsObtained: 1,
-        executionTimeMs: Date.now() - startTime,
-        debugSteps
-      };
-      const logs = storageService.getWaterSyncLogs();
-      localStorage.setItem(WATER_SYNC_LOGS_KEY, JSON.stringify([log, ...logs.slice(0, 99)]));
-
-      if (isPeak) {
-        storageService.addNotification({
-          id: crypto.randomUUID(),
-          userId: 'any',
-          title: '🚨 ALERTA: CONSUMO DE AGUA ANÓMALO',
-          message: `Detección en contador principal: ${consumption} m³ hoy. Supera umbral (+${percentOverAvg.toFixed(0)}%).`,
-          type: 'system',
-          read: false,
-          date: new Date().toISOString()
-        });
-      }
-
-      return { success: true, reading: newReading, message: 'Portal Aguas de Alicante sincronizado.' };
+      await setDoc(doc(db, 'readings', reading.id), reading);
     } catch (e) {
-      logStep("❌ Error crítico en etapa de extracción.");
-      return { success: false, message: 'Error de red en portal externo.' };
+      handleFirestoreError(e, OperationType.CREATE, 'readings');
     }
   },
-
-  // --- BUILDINGS ---
-  getBuildings: (): Building[] => {
-    return BUILDINGS;
+  deleteReading: async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'readings', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'readings');
+    }
   },
 
   // --- USERS ---
   getUsers: (): User[] => {
-    const data = localStorage.getItem(USERS_KEY);
-    const initial: User[] = [
-      { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] }
-    ];
-
-    if (!data) {
-      localStorage.setItem(USERS_KEY, JSON.stringify(initial));
-      return initial;
+    if (cache.users.length === 0) {
+      // Fallback to a master user if empty (for first run)
+      return [{
+        id: 'master-1',
+        name: 'Administrador Maestro',
+        username: 'admin',
+        password: '123',
+        role: 'MASTER',
+        status: 'approved',
+        assignedBuildings: BUILDINGS.map(b => b.id),
+        assignedUnits: ['USAC', 'GCG', 'BOEL', 'GOE4'],
+        isManto: true
+      }];
     }
+    return cache.users;
+  },
+  getUserById: (id: string): User | null => {
+    return cache.users.find((u: any) => u.id === id) || null;
+  },
+  saveUser: async (user: User) => {
     try {
-      const users: User[] = JSON.parse(data);
-      if (users.length === 0) {
-        localStorage.setItem(USERS_KEY, JSON.stringify(initial));
-        return initial;
-      }
-      // Ensure master exists in the list
-      if (!users.find(u => u.role === 'MASTER')) {
-        const updated = [initial[0], ...users];
-        localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-        return updated;
-      }
-      return users;
+      await setDoc(doc(db, 'users', user.id), user);
     } catch (e) {
-      return initial;
+      handleFirestoreError(e, OperationType.CREATE, 'users');
     }
   },
-
-  saveUser: (user: User) => {
-    const users = storageService.getUsers();
-    const updated = [...users, user];
-    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  updateUser: (user: User) => {
-    const users = storageService.getUsers();
-    const updated = users.map(u => u.id === user.id ? user : u);
-    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  updateUserStatus: (userId: string, status: UserStatus, assignedBuildings: string[], assignedUnits: Role[]) => {
-    const users = storageService.getUsers();
-    const updated = users.map(u => u.id === userId ? { ...u, status, assignedBuildings, assignedUnits } : u);
-    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  resetUserPassword: (userId: string, newPass: string) => {
-    const users = storageService.getUsers();
-    const updated = users.map(u => u.id === userId ? { ...u, password: newPass } : u);
-    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  updateUserLeaveDays: (userId: string, leaveDays: string[]) => {
-    const users = storageService.getUsers();
-    const updated = users.map(u => u.id === userId ? { ...u, leaveDays } : u);
-    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  addLeaveEntry: (userId: string, entry: LeaveEntry) => {
-    const users = storageService.getUsers();
-    const userIndex = users.findIndex(u => u.id === userId);
-    if (userIndex > -1) {
-      const user = users[userIndex];
-      if (!user.leaveEntries) user.leaveEntries = [];
-      user.leaveEntries.push(entry);
-      
-      // Update leaveDays for backward compatibility
-      if (!user.leaveDays) user.leaveDays = [];
-      const start = new Date(entry.startDate);
-      const end = new Date(entry.endDate);
-      const current = new Date(start);
-      while (current <= end) {
-        const dateStr = getLocalDateString(current);
-        if (!user.leaveDays.includes(dateStr)) {
-          user.leaveDays.push(dateStr);
-        }
-        current.setDate(current.getDate() + 1);
-      }
-      
-      users[userIndex] = user;
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
-      saveToServer();
-    }
-  },
-
-  // --- READINGS ---
-  getReadings: (buildingId?: string, service?: ServiceType): Reading[] => {
-    const data = localStorage.getItem(READINGS_KEY);
-    if (!data) return [];
+  updateUser: async (user: User) => {
     try {
-      let readings: Reading[] = JSON.parse(data);
-      if (buildingId) readings = readings.filter(r => r.buildingId === buildingId);
-      if (service) readings = readings.filter(r => r.serviceType === service);
-      return readings;
+      await setDoc(doc(db, 'users', user.id), user);
     } catch (e) {
-      console.error("Error parsing readings", e);
-      return [];
+      handleFirestoreError(e, OperationType.UPDATE, 'users');
     }
   },
-
-  saveReading: (reading: Reading) => {
-    const readings = storageService.getReadings();
-    if (!reading.consumption1) {
-      const prev = readings.filter(r => r.buildingId === reading.buildingId && r.serviceType === reading.serviceType).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-      if (prev) {
-        reading.consumption1 = reading.value1 - prev.value1;
-        if (reading.value2 !== undefined && prev.value2 !== undefined) {
-          reading.consumption2 = reading.value2 - prev.value2;
-        }
-      } else {
-        reading.consumption1 = 0;
-        reading.consumption2 = 0;
+  updateUserStatus: async (userId: string, status: UserStatus, assignedBuildings: string[], assignedUnits: Role[]) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), { status, assignedBuildings, assignedUnits });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'users');
+    }
+  },
+  resetUserPassword: async (userId: string, newPassword: string) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), { password: newPassword });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'users');
+    }
+  },
+  updateUserLeaveDays: async (userId: string, leaveDays: string[]) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), { leaveDays });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'users');
+    }
+  },
+  addLeaveEntry: async (userId: string, entry: LeaveEntry) => {
+    try {
+      const user = cache.users.find((u: any) => u.id === userId);
+      if (user) {
+        // We add the startDate to leaveDays for simplicity in the UI check
+        const updatedLeaveDays = [...(user.leaveDays || []), entry.startDate];
+        const updatedLeaveEntries = [...(user.leaveEntries || []), entry];
+        await updateDoc(doc(db, 'users', userId), { 
+          leaveDays: updatedLeaveDays,
+          leaveEntries: updatedLeaveEntries
+        });
       }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'users');
     }
-    const updated = [...readings, reading];
-    localStorage.setItem(READINGS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  deleteReading: (id: string) => {
-    const readings = storageService.getReadings();
-    const filtered = readings.filter(r => r.id !== id);
-    localStorage.setItem(READINGS_KEY, JSON.stringify(filtered));
-    saveToServer();
   },
 
   // --- REQUESTS ---
-  getRequests: (): RequestItem[] => {
-    const data = localStorage.getItem(REQUESTS_KEY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  saveRequest: (request: RequestItem) => {
-    const requests = storageService.getRequests();
-    const updated = [request, ...requests];
-    localStorage.setItem(REQUESTS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  updateRequestStatus: (id: string, status: RequestItem['status'], structuralSolution?: string, workDetails?: RequestItem['workDetails']) => {
-    const requests = storageService.getRequests();
-    const updated = requests.map(r => r.id === id ? { 
-      ...r, 
-      status, 
-      resolvedAt: status === 'closed' || status === 'resolved_by_ai' ? new Date().toISOString() : r.resolvedAt,
-      structuralSolution: structuralSolution || r.structuralSolution,
-      workDetails: workDetails || r.workDetails
-    } : r);
-    localStorage.setItem(REQUESTS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  // --- TASKS ---
-  getTasks: (): CalendarTask[] => {
-    const data = localStorage.getItem(TASKS_KEY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  saveTask: (task: CalendarTask) => {
-    const tasks = storageService.getTasks();
-    const index = tasks.findIndex(t => t.id === task.id);
-    let updated;
-    if (index > -1) {
-      tasks[index] = task;
-      updated = [...tasks];
-    } else {
-      updated = [task, ...tasks];
+  getRequests: (): RequestItem[] => cache.requests,
+  saveRequest: async (request: RequestItem) => {
+    try {
+      await setDoc(doc(db, 'requests', request.id), request);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'requests');
     }
-    localStorage.setItem(TASKS_KEY, JSON.stringify(updated));
-    saveToServer();
   },
-
-  deleteTask: (id: string) => {
-    const tasks = storageService.getTasks();
-    const filtered = tasks.filter(t => t.id !== id);
-    localStorage.setItem(TASKS_KEY, JSON.stringify(filtered));
-    saveToServer();
+  updateRequestStatus: async (requestId: string, status: RequestItem['status'], technicianId?: string, workDetails?: any) => {
+    try {
+      const updateData: any = { status };
+      if (technicianId) updateData.technicianId = technicianId;
+      if (workDetails) updateData.workDetails = workDetails;
+      await updateDoc(doc(db, 'requests', requestId), updateData);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'requests');
+    }
   },
-
-  // --- NOTIFICATIONS ---
-  getNotifications: (userId: string): AppNotification[] => {
-    const data = localStorage.getItem(NOTIFICATIONS_KEY);
-    const all: AppNotification[] = data ? JSON.parse(data) : [];
-    return all.filter(n => n.userId === userId || n.userId === 'any').sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  },
-
-  addNotification: (notification: AppNotification) => {
-    const data = localStorage.getItem(NOTIFICATIONS_KEY);
-    const all: AppNotification[] = data ? JSON.parse(data) : [];
-    const updated = [notification, ...all];
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  markNotificationAsRead: (id: string) => {
-    const data = localStorage.getItem(NOTIFICATIONS_KEY);
-    if (!data) return;
-    const all: AppNotification[] = JSON.parse(data);
-    const updated = all.map(n => n.id === id ? { ...n, read: true } : n);
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  clearNotifications: (userId: string) => {
-    const data = localStorage.getItem(NOTIFICATIONS_KEY);
-    if (!data) return;
-    const all: AppNotification[] = JSON.parse(data);
-    const updated = all.filter(n => n.userId !== userId);
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
-    saveToServer();
+  getNextRegistrationNumber: (): string => {
+    const count = cache.requests.length + 1;
+    const year = new Date().getFullYear();
+    return `USAC/${year}/${count.toString().padStart(4, '0')}`;
   },
 
   // --- GASOIL ---
-  getGasoilTanks: (): GasoilTank[] => {
-    const data = localStorage.getItem(GASOIL_TANKS_KEY);
-    if (data) return JSON.parse(data);
-    
-    const initial: GasoilTank[] = BUILDINGS.filter(b => b.hasBoiler).map((b, idx) => ({
-      id: `tank-${b.id}`,
-      buildingId: b.id,
-      buildingCode: b.code,
-      buildingName: b.name,
-      tankNumber: 1,
-      fullName: `Depósito ${b.code}`,
-      totalCapacity: 2000,
-      currentLevel: 75,
-      currentLitres: 1500,
-      alertStatus: 'normal',
-      daysRemaining: 45
-    }));
-    localStorage.setItem(GASOIL_TANKS_KEY, JSON.stringify(initial));
-    return initial;
+  getGasoilTanks: (): GasoilTank[] => cache.gasoil_tanks,
+  getGasoilReadings: (): GasoilReading[] => cache.gasoil_readings,
+  getRefuelRequests: (): RefuelRequest[] => cache.refuel_requests,
+  saveGasoilReading: async (reading: GasoilReading) => {
+    try {
+      await setDoc(doc(db, 'gasoil_readings', reading.id), reading);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'gasoil_readings');
+    }
   },
-
-  saveGasoilReading: (reading: GasoilReading) => {
-    const readings = JSON.parse(localStorage.getItem(GASOIL_READINGS_KEY) || '[]');
-    const updatedReadings = [reading, ...readings];
-    localStorage.setItem(GASOIL_READINGS_KEY, JSON.stringify(updatedReadings));
-    saveToServer();
-
-    // Update Tank
-    const tanks = storageService.getGasoilTanks();
-    const updatedTanks = tanks.map(t => {
-      if (t.id === reading.tankId) {
-        let status: GasoilAlertStatus = 'normal';
-        if (reading.percentage <= 10) status = 'critico';
-        else if (reading.percentage <= 25) status = 'bajo';
-        else if (reading.percentage <= 40) status = 'atencion';
-
-        return {
-          ...t,
-          currentLevel: reading.percentage,
-          currentLitres: reading.litres,
-          lastReading: reading.date,
-          alertStatus: status
-        };
-      }
-      return t;
-    });
-    localStorage.setItem(GASOIL_TANKS_KEY, JSON.stringify(updatedTanks));
-    saveToServer();
+  saveRefuelRequest: async (request: RefuelRequest) => {
+    try {
+      await setDoc(doc(db, 'refuel_requests', request.id), request);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'refuel_requests');
+    }
   },
-
-  saveRefuelRequest: (request: RefuelRequest) => {
-    const requests = JSON.parse(localStorage.getItem(REFUEL_REQUESTS_KEY) || '[]');
-    const updated = [request, ...requests];
-    localStorage.setItem(REFUEL_REQUESTS_KEY, JSON.stringify(updated));
-    saveToServer();
+  updateRefuelRequestStatus: async (id: string, status: RefuelRequest['status']) => {
+    try {
+      await updateDoc(doc(db, 'refuel_requests', id), { status });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'refuel_requests');
+    }
   },
 
   // --- SALT ---
-  getSaltWarehouse: (): SaltWarehouse => {
-    const data = localStorage.getItem(SALT_STOCK_KEY);
-    return data ? JSON.parse(data) : { sacksAvailable: 25, kgPerSack: 25, minAlertLevel: 10, criticalAlertLevel: 5, status: 'normal' };
+  getSaltStock: (): SaltWarehouse | null => cache.salt_stock,
+  getSaltWarehouse: (): SaltWarehouse | null => cache.salt_stock,
+  getSaltSofteners: (): SaltSoftener[] => cache.salt_softeners,
+  getSaltRefillLogs: (): SaltRefillLog[] => cache.salt_refill_logs,
+  getSaltEntryLogs: (): SaltEntryLog[] => cache.salt_entry_logs,
+  updateSaltStock: async (stock: SaltWarehouse) => {
+    try {
+      await setDoc(doc(db, 'salt_stock', 'current'), stock);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'salt_stock');
+    }
+  },
+  saveSaltRefill: async (log: any) => {
+    try {
+      const warehouse = cache.salt_stock;
+      const stockBefore = warehouse?.sacksAvailable || 0;
+      const stockAfter = stockBefore - log.sacksUsed;
+      
+      const fullLog: SaltRefillLog = {
+        id: crypto.randomUUID(),
+        stockBefore,
+        stockAfter,
+        ...log
+      };
+      
+      await setDoc(doc(db, 'salt_refill_logs', fullLog.id), fullLog);
+      
+      // Update warehouse stock
+      if (warehouse) {
+        await setDoc(doc(db, 'salt_stock', 'current'), {
+          ...warehouse,
+          sacksAvailable: stockAfter
+        });
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'salt_refill_logs');
+    }
+  },
+  saveSaltRefillLog: async (log: SaltRefillLog) => {
+    try {
+      await setDoc(doc(db, 'salt_refill_logs', log.id), log);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'salt_refill_logs');
+    }
+  },
+  saveSaltEntry: async (log: any) => {
+    try {
+      const warehouse = cache.salt_stock;
+      const fullLog: SaltEntryLog = {
+        id: crypto.randomUUID(),
+        ...log
+      };
+      await setDoc(doc(db, 'salt_entry_logs', fullLog.id), fullLog);
+      
+      // Update warehouse stock
+      if (warehouse) {
+        await setDoc(doc(db, 'salt_stock', 'current'), {
+          ...warehouse,
+          sacksAvailable: warehouse.sacksAvailable + log.sacksReceived,
+          lastSupplier: log.supplier
+        });
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'salt_entry_logs');
+    }
+  },
+  saveSaltEntryLog: async (log: SaltEntryLog) => {
+    try {
+      await setDoc(doc(db, 'salt_entry_logs', log.id), log);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'salt_entry_logs');
+    }
   },
 
-  getSaltSofteners: (): SaltSoftener[] => {
-    const data = localStorage.getItem(SALT_SOFTENERS_KEY);
-    if (data) return JSON.parse(data);
-    const initial: SaltSoftener[] = BUILDINGS.filter(b => b.hasBoiler).map(b => ({
-      id: `soft-${b.id}`,
-      buildingId: b.id,
-      buildingCode: b.code,
-      buildingName: b.name
-    }));
-    localStorage.setItem(SALT_SOFTENERS_KEY, JSON.stringify(initial));
-    return initial;
+  // --- WATER ACCOUNTS ---
+  getWaterAccounts: (): WaterAccount[] => cache.water_accounts,
+  getWaterAccount: (id?: string): WaterAccount | null => {
+    if (id) return cache.water_accounts.find((a: any) => a.id === id) || null;
+    return cache.water_accounts[0] || null;
   },
-
-  getSaltRefillLogs: (): SaltRefillLog[] => {
-    const data = localStorage.getItem(SALT_REFILL_LOGS_KEY);
-    return data ? JSON.parse(data) : [];
+  getWaterSyncLogs: (): WaterSyncLog[] => cache.water_sync_logs,
+  saveWaterAccount: async (account: WaterAccount) => {
+    try {
+      await setDoc(doc(db, 'water_accounts', account.id), account);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'water_accounts');
+    }
   },
-
-  saveSaltRefill: (logData: Omit<SaltRefillLog, 'id' | 'stockBefore' | 'stockAfter'>) => {
-    const warehouse = storageService.getSaltWarehouse();
-    const stockBefore = warehouse.sacksAvailable;
-    const stockAfter = stockBefore - logData.sacksUsed;
+  saveWaterSyncLog: async (log: WaterSyncLog) => {
+    try {
+      await setDoc(doc(db, 'water_sync_logs', log.id), log);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'water_sync_logs');
+    }
+  },
+  simulateWaterSync: async (accountId: string, onProgress?: (msg: string) => void): Promise<any> => {
+    if (onProgress) {
+      onProgress("[BROWSER] Iniciando motor Puppeteer...");
+      await new Promise(r => setTimeout(r, 500));
+      onProgress("[AUTH] Accediendo a oficina virtual Aguas de Alicante...");
+      await new Promise(r => setTimeout(r, 800));
+      onProgress("[SCRAPE] Localizando tabla de consumos históricos...");
+      await new Promise(r => setTimeout(r, 1000));
+      onProgress("[DATA] Extrayendo última lectura validada...");
+    }
     
-    const newLog: SaltRefillLog = {
-      ...logData,
+    const account = cache.water_accounts.find((a: any) => a.id === accountId);
+    if (!account) return { success: false, message: "Cuenta no encontrada" };
+
+    const lastReading = cache.readings.filter((r: any) => r.buildingId === account.buildingId && r.serviceType === 'agua').sort((a: any, b: any) => b.date.localeCompare(a.date))[0];
+    
+    const newValue = (lastReading?.value1 || 1000) + Math.floor(Math.random() * 50);
+    const consumption = newValue - (lastReading?.value1 || 1000);
+    
+    const reading: Reading = {
       id: crypto.randomUUID(),
-      stockBefore,
-      stockAfter
+      buildingId: account.buildingId,
+      date: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
+      userId: 'system',
+      serviceType: 'agua',
+      origin: 'telematica',
+      value1: newValue,
+      consumption1: consumption,
+      isPeak: consumption > account.peakThresholdM3
     };
 
-    const logs = storageService.getSaltRefillLogs();
-    const updatedLogs = [newLog, ...logs];
-    localStorage.setItem(SALT_REFILL_LOGS_KEY, JSON.stringify(updatedLogs));
-    saveToServer();
+    await setDoc(doc(db, 'readings', reading.id), reading);
 
-    warehouse.sacksAvailable = stockAfter;
-    if (stockAfter <= warehouse.criticalAlertLevel) warehouse.status = 'critico';
-    else if (stockAfter <= warehouse.minAlertLevel) warehouse.status = 'bajo';
-    else warehouse.status = 'normal';
-    localStorage.setItem(SALT_STOCK_KEY, JSON.stringify(warehouse));
-    saveToServer();
-
-    const softeners = storageService.getSaltSofteners();
-    const updatedSoft = softeners.map(s => s.id === logData.softenerId ? { ...s, lastRefillDate: logData.date, lastRefillSacks: logData.sacksUsed } : s);
-    localStorage.setItem(SALT_SOFTENERS_KEY, JSON.stringify(updatedSoft));
-    saveToServer();
+    return { 
+      success: true, 
+      message: "Sincronización completada con éxito",
+      reading 
+    };
   },
 
-  saveSaltEntry: (log: Omit<SaltEntryLog, 'id'>) => {
-    const newLog: SaltEntryLog = { ...log, id: crypto.randomUUID() };
-    const logs = JSON.parse(localStorage.getItem(SALT_ENTRY_LOGS_KEY) || '[]');
-    const updatedLogs = [newLog, ...logs];
-    localStorage.setItem(SALT_ENTRY_LOGS_KEY, JSON.stringify(updatedLogs));
-    saveToServer();
+  // --- TASKS ---
+  getTasks: (): CalendarTask[] => cache.tasks,
+  saveTask: async (task: CalendarTask) => {
+    try {
+      await setDoc(doc(db, 'tasks', task.id), task);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'tasks');
+    }
+  },
+  deleteTask: async (taskId: string) => {
+    try {
+      await deleteDoc(doc(db, 'tasks', taskId));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'tasks');
+    }
+  },
 
-    const warehouse = storageService.getSaltWarehouse();
-    warehouse.sacksAvailable += log.sacksReceived;
-    warehouse.lastSupplier = log.supplier;
-    if (warehouse.sacksAvailable > warehouse.minAlertLevel) warehouse.status = 'normal';
-    localStorage.setItem(SALT_STOCK_KEY, JSON.stringify(warehouse));
-    saveToServer();
+  // --- NOTIFICATIONS ---
+  getNotifications: (userId?: string): AppNotification[] => {
+    if (userId) {
+      return cache.notifications.filter((n: any) => n.userId === userId);
+    }
+    return cache.notifications;
+  },
+  addNotification: async (notification: AppNotification) => {
+    try {
+      await setDoc(doc(db, 'notifications', notification.id), notification);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'notifications');
+    }
+  },
+  saveNotification: async (notification: AppNotification) => {
+    try {
+      await setDoc(doc(db, 'notifications', notification.id), notification);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'notifications');
+    }
+  },
+  markNotificationAsRead: async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { read: true });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'notifications');
+    }
+  },
+  markNotificationRead: async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { read: true });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'notifications');
+    }
+  },
+  clearNotifications: async (userId?: string) => {
+    try {
+      const batch: any = [];
+      const toDelete = userId 
+        ? cache.notifications.filter((n: any) => n.userId === userId)
+        : cache.notifications;
+      
+      toDelete.forEach((n: any) => {
+        batch.push(deleteDoc(doc(db, 'notifications', n.id)));
+      });
+      await Promise.all(batch);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'notifications');
+    }
+  },
+
+  // --- EXTERNAL CONTACTS ---
+  getExternalContacts: (): ExternalUser[] => cache.external_contacts,
+  saveExternalContact: async (contact: ExternalUser) => {
+    try {
+      await setDoc(doc(db, 'external_contacts', contact.id), contact);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'external_contacts');
+    }
   },
 
   // --- BOILERS ---
-  getBoilers: (): Boiler[] => {
-    const data = localStorage.getItem(BOILERS_KEY);
-    if (data) return JSON.parse(data);
-
-    const initial: Boiler[] = BUILDINGS.filter(b => b.hasBoiler).map(b => ({
-      id: `cal-${b.id}`,
-      buildingId: b.id,
-      buildingCode: b.code,
-      buildingName: b.name,
-      code: `CAL-${b.code}`,
-      brand: 'Ferroli',
-      powerKw: 150,
-      status: 'operativa',
-      refTemps: {
-        impulsionMin: 60,
-        impulsionMax: 80,
-        pressureMin: 1.0,
-        pressureMax: 2.0
-      }
-    }));
-    localStorage.setItem(BOILERS_KEY, JSON.stringify(initial));
-    return initial;
-  },
-
-  updateBoilerStatus: (id: string, status: BoilerStatus) => {
-    const boilers = storageService.getBoilers();
-    const updated = boilers.map(b => b.id === id ? { ...b, status } : b);
-    localStorage.setItem(BOILERS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  getBoilerReadings: (boilerId?: string): BoilerTemperatureReading[] => {
-    const data = localStorage.getItem(BOILER_READINGS_KEY);
-    let readings: BoilerTemperatureReading[] = data ? JSON.parse(data) : [];
-    if (boilerId) readings = readings.filter(r => r.boilerId === boilerId);
-    return readings.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  },
-
-  saveBoilerReading: (reading: BoilerTemperatureReading) => {
-    const readings = storageService.getBoilerReadings();
-    const updated = [reading, ...readings];
-    localStorage.setItem(BOILER_READINGS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  getBoilerMaintenance: (boilerId?: string): BoilerMaintenanceRecord[] => {
-    const data = localStorage.getItem(BOILER_MAINTENANCE_KEY);
-    let records: BoilerMaintenanceRecord[] = data ? JSON.parse(data) : [];
-    if (boilerId) records = records.filter(r => r.boilerId === boilerId);
-    return records.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  },
-
-  saveBoilerMaintenance: (record: BoilerMaintenanceRecord) => {
-    const records = storageService.getBoilerMaintenance();
-    const updated = [record, ...records];
-    localStorage.setItem(BOILER_MAINTENANCE_KEY, JSON.stringify(updated));
-    saveToServer();
-    storageService.updateBoilerStatus(record.boilerId, record.statusAfter);
-  },
-
-  saveExternalContact: (contact: ExternalUser) => {
-    const data = localStorage.getItem(EXTERNAL_CONTACTS_KEY);
-    const all: ExternalUser[] = data ? JSON.parse(data) : [];
-    const updated = [contact, ...all];
-    localStorage.setItem(EXTERNAL_CONTACTS_KEY, JSON.stringify(updated));
-    saveToServer();
-  },
-
-  getExternalContacts: (): ExternalUser[] => {
-    const data = localStorage.getItem(EXTERNAL_CONTACTS_KEY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  // --- MATERIAL MANAGEMENT ---
-  getNextRegistrationNumber: (): string => {
-    const requests = storageService.getRequests();
-    const year = new Date().getFullYear();
-    const prefix = `MAT-${year}-`;
-    const yearRequests = requests.filter(r => r.registrationNumber?.startsWith(prefix));
-    
-    let nextNum = 1;
-    if (yearRequests.length > 0) {
-      const numbers = yearRequests.map(r => {
-        const parts = r.registrationNumber?.split('-');
-        return parts ? parseInt(parts[parts.length - 1]) : 0;
-      });
-      nextNum = Math.max(...numbers) + 1;
+  getBoilers: (): Boiler[] => cache.boilers,
+  getBoilerReadings: (): BoilerTemperatureReading[] => cache.boiler_readings,
+  getBoilerMaintenance: (): BoilerMaintenanceRecord[] => cache.boiler_maintenance,
+  saveBoilerReading: async (reading: BoilerTemperatureReading) => {
+    try {
+      await setDoc(doc(db, 'boiler_readings', reading.id), reading);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'boiler_readings');
     }
-    
-    return `${prefix}${nextNum.toString().padStart(3, '0')}`;
   },
-
-  getProviders: (): Provider[] => {
-    const data = localStorage.getItem(PROVIDERS_KEY);
-    if (!data) {
-      const initial: Provider[] = [
-        {
-          id: 'prov-1',
-          name: 'Ferretería Industrial García',
-          phone: '965123456',
-          email: 'pedidos@ferreteriagarcia.es',
-          categories: ['ferreteria', 'electricidad', 'fontaneria'],
-          isPreferred: true,
-          rating: 4.5,
-          totalOrders: 12,
-          hasCustomerAccount: true,
-          generalDiscount: 10,
-          deliveryTimeDays: 1,
-          doesShipping: true,
-          status: 'activo',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'prov-2',
-          name: 'Suministros Eléctricos Levante',
-          phone: '965234567',
-          email: 'ventas@sellevante.com',
-          categories: ['electricidad'],
-          isPreferred: true,
-          rating: 4.8,
-          totalOrders: 8,
-          hasCustomerAccount: true,
-          generalDiscount: 15,
-          deliveryTimeDays: 2,
-          doesShipping: true,
-          status: 'activo',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'prov-3',
-          name: 'Fontanería Hermanos López',
-          phone: '965345678',
-          email: 'info@fontanerialopez.es',
-          categories: ['fontaneria', 'climatizacion'],
-          isPreferred: false,
-          rating: 4.0,
-          totalOrders: 5,
-          hasCustomerAccount: false,
-          generalDiscount: 0,
-          deliveryTimeDays: 1,
-          doesShipping: true,
-          status: 'activo',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'prov-4',
-          name: 'Pinturas y Decoración Alicante',
-          phone: '965456789',
-          email: 'pedidos@pinturasalicante.com',
-          categories: ['pintura', 'ferreteria'],
-          isPreferred: false,
-          rating: 4.2,
-          totalOrders: 3,
-          hasCustomerAccount: false,
-          generalDiscount: 5,
-          deliveryTimeDays: 2,
-          doesShipping: true,
-          status: 'activo',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'prov-5',
-          name: 'Suministros de Oficina Express',
-          phone: '965567890',
-          email: 'pedidos@oficinaexpress.es',
-          categories: ['oficina', 'limpieza'],
-          isPreferred: true,
-          rating: 4.7,
-          totalOrders: 15,
-          hasCustomerAccount: true,
-          generalDiscount: 12,
-          deliveryTimeDays: 1,
-          doesShipping: true,
-          status: 'activo',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'prov-6',
-          name: 'Bricomart Alicante',
-          phone: '965678901',
-          email: 'atencion@bricomart.es',
-          categories: ['ferreteria', 'electricidad', 'fontaneria', 'pintura', 'jardineria', 'construccion'],
-          isPreferred: false,
-          rating: 3.8,
-          totalOrders: 20,
-          hasCustomerAccount: false,
-          generalDiscount: 0,
-          deliveryTimeDays: 1,
-          doesShipping: false,
-          status: 'activo',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'prov-7',
-          name: 'Leroy Merlin San Juan',
-          phone: '965789012',
-          email: 'sanjuan@leroymerlin.es',
-          categories: ['ferreteria', 'electricidad', 'fontaneria', 'pintura', 'jardineria', 'carpinteria'],
-          isPreferred: false,
-          rating: 3.9,
-          totalOrders: 18,
-          hasCustomerAccount: false,
-          generalDiscount: 0,
-          deliveryTimeDays: 1,
-          doesShipping: true,
-          status: 'activo',
-          createdAt: new Date().toISOString()
-        }
-      ];
-      localStorage.setItem(PROVIDERS_KEY, JSON.stringify(initial));
-      return initial;
+  saveBoilerMaintenance: async (record: BoilerMaintenanceRecord) => {
+    try {
+      await setDoc(doc(db, 'boiler_maintenance', record.id), record);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'boiler_maintenance');
     }
-    return JSON.parse(data);
   },
-
-  getCategories: (): MaterialCategory[] => {
-    const data = localStorage.getItem(CATEGORIES_KEY);
-    if (!data) {
-      const initial: MaterialCategory[] = [
-        { id: 'cat-1', name: 'ferreteria', icon: '🔧', color: '#6b7280', order: 1 },
-        { id: 'cat-2', name: 'fontaneria', icon: '🚰', color: '#3b82f6', order: 2 },
-        { id: 'cat-3', name: 'electricidad', icon: '⚡', color: '#f59e0b', order: 3 },
-        { id: 'cat-4', name: 'climatizacion', icon: '❄️', color: '#06b6d4', order: 4 },
-        { id: 'cat-5', name: 'pintura', icon: '🎨', color: '#ec4899', order: 5 },
-        { id: 'cat-6', name: 'limpieza', icon: '🧹', color: '#10b981', order: 6 },
-        { id: 'cat-7', name: 'jardineria', icon: '🌱', color: '#22c55e', order: 7 },
-        { id: 'cat-8', name: 'oficina', icon: '📎', color: '#8b5cf6', order: 8 },
-        { id: 'cat-9', name: 'seguridad', icon: '🔒', color: '#ef4444', order: 9 },
-        { id: 'cat-10', name: 'construccion', icon: '🧱', color: '#78716c', order: 10 },
-        { id: 'cat-11', name: 'carpinteria', icon: '🪵', color: '#a16207', order: 11 },
-        { id: 'cat-12', name: 'informatica', icon: '💻', color: '#0ea5e9', order: 12 },
-        { id: 'cat-13', name: 'otros', icon: '📦', color: '#9ca3af', order: 99 }
-      ];
-      localStorage.setItem(CATEGORIES_KEY, JSON.stringify(initial));
-      return initial;
+  updateBoilerStatus: async (boilerId: string, status: BoilerStatus) => {
+    try {
+      await updateDoc(doc(db, 'boilers', boilerId), { status });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'boilers');
     }
-    return JSON.parse(data);
   },
 
-  saveProvider: (provider: Provider) => {
-    const providers = storageService.getProviders();
-    const updated = [provider, ...providers];
-    localStorage.setItem(PROVIDERS_KEY, JSON.stringify(updated));
-    saveToServer();
+  // --- PROVIDERS & CATEGORIES ---
+  getProviders: (): Provider[] => cache.providers,
+  findProvider: (criteria: { name?: string, email?: string, phone?: string, cif?: string }): Provider | null => {
+    return cache.providers.find((p: any) => {
+      if (criteria.name && p.name === criteria.name) return true;
+      if (criteria.email && p.email === criteria.email) return true;
+      if (criteria.phone && p.phone === criteria.phone) return true;
+      if (criteria.cif && p.cif === criteria.cif) return true;
+      return false;
+    }) || null;
+  },
+  getCategories: (): MaterialCategory[] => cache.categories,
+  saveProvider: async (provider: Provider) => {
+    try {
+      await setDoc(doc(db, 'providers', provider.id), provider);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'providers');
+    }
+  },
+  updateProvider: async (provider: Provider) => {
+    try {
+      await setDoc(doc(db, 'providers', provider.id), provider);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'providers');
+    }
+  },
+  saveCategory: async (category: MaterialCategory) => {
+    try {
+      await setDoc(doc(db, 'categories', category.id), category);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'categories');
+    }
   },
 
-  updateProvider: (provider: Provider) => {
-    const providers = storageService.getProviders();
-    const updated = providers.map(p => p.id === provider.id ? provider : p);
-    localStorage.setItem(PROVIDERS_KEY, JSON.stringify(updated));
-    saveToServer();
+  // --- SESSION (Still using localStorage for non-sensitive UI state) ---
+  getCurrentUser: (): User | null => {
+    const saved = localStorage.getItem('sigai_current_user_v1');
+    return saved ? JSON.parse(saved) : null;
   },
-
-  findProvider: (query: { name?: string, email?: string, phone?: string, cif?: string }): Provider | null => {
-    const providers = storageService.getProviders();
-    return providers.find(p => 
-      (query.cif && p.cif && p.cif.toUpperCase().replace(/[^A-Z0-9]/g, '') === query.cif.toUpperCase().replace(/[^A-Z0-9]/g, '')) ||
-      (query.name && p.name.toLowerCase() === query.name.toLowerCase()) ||
-      (query.email && p.email && p.email.toLowerCase() === query.email.toLowerCase()) ||
-      (query.phone && p.phone && p.phone.replace(/\s/g, '') === query.phone.replace(/\s/g, ''))
-    ) || null;
-  },
-
-  // --- SESSION MANAGEMENT ---
   setCurrentUser: (user: User | null) => {
     if (user) {
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+      localStorage.setItem('sigai_current_user_v1', JSON.stringify(user));
     } else {
-      localStorage.removeItem(CURRENT_USER_KEY);
-    }
-  },
-
-  getCurrentUser: (): User | null => {
-    const data = localStorage.getItem(CURRENT_USER_KEY);
-    if (!data) return null;
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      return null;
+      localStorage.removeItem('sigai_current_user_v1');
     }
   }
 };

@@ -4,6 +4,10 @@ import { ShieldCheck, User as UserIcon, Lock, ChevronLeft, ChevronRight, UserPlu
 import { Role, User } from '../types';
 import { storageService } from '../services/storageService';
 
+import { auth, db } from '../firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+
 interface AuthModalProps {
   initialRole: Role;
   onLogin: (user: User) => void;
@@ -21,61 +25,150 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
     isManto: false
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const users = storageService.getUsers();
-    
-    const user = users.find(u => {
-      const matchCredentials = u.username === formData.username && u.password === formData.password;
-      if (!matchCredentials) return false;
-      if (u.role === 'MASTER') return true; 
-      // Si estamos en el modal de una unidad específica, permitimos al usuario entrar si su rol coincide
-      return u.role === initialRole;
-    });
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
 
-    if (!user) {
-      setError('Credenciales incorrectas o acceso no autorizado para esta unidad');
-      return;
+      // Check if user exists in Firestore
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      
+      if (userDoc.exists()) {
+        const user = userDoc.data() as User;
+        if (user.status !== 'approved' && user.role !== 'MASTER') {
+          setView('pending');
+        } else {
+          onLogin(user);
+        }
+      } else {
+        // Create new user from Google profile
+        const newUser: User = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Usuario Google',
+          username: firebaseUser.email?.split('@')[0] || 'google_user',
+          password: '',
+          role: firebaseUser.email === 'JCYebenes@gmail.com' ? 'MASTER' : initialRole,
+          status: firebaseUser.email === 'JCYebenes@gmail.com' ? 'approved' : 'pending',
+          assignedBuildings: [],
+          assignedUnits: [],
+          phone: '',
+          isManto: false,
+          leaveDays: []
+        };
+        await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+        
+        if (newUser.status === 'approved') {
+          onLogin(newUser);
+        } else {
+          setView('pending');
+        }
+      }
+    } catch (err: any) {
+      console.error("Google Login error:", err);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('El acceso con Google no está habilitado en la consola de Firebase.');
+      } else {
+        setError('Error al acceder con Google');
+      }
+    } finally {
+      setLoading(false);
     }
-
-    if (user.status !== 'approved') {
-      setView('pending');
-      return;
-    }
-
-    onLogin(user);
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Map username to email for Firebase Auth
+      const email = formData.username.includes('@') ? formData.username : `${formData.username.toLowerCase()}@sigai.local`;
+      const userCredential = await signInWithEmailAndPassword(auth, email, formData.password);
+      const firebaseUser = userCredential.user;
+
+      // Fetch user profile from Firestore
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      if (!userDoc.exists()) {
+        setError('Perfil de usuario no encontrado en la base de datos');
+        return;
+      }
+
+      const user = userDoc.data() as User;
+      
+      // Check if user has the right role for this unit
+      if (user.role !== 'MASTER' && user.role !== initialRole) {
+        setError('Acceso no autorizado para esta unidad');
+        return;
+      }
+
+      if (user.status !== 'approved' && user.role !== 'MASTER') {
+        setView('pending');
+        return;
+      }
+
+      onLogin(user);
+    } catch (err: any) {
+      console.error("Login error:", err);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('El acceso con Email/Contraseña no está habilitado en la consola de Firebase.');
+      } else {
+        setError('Credenciales incorrectas o usuario no registrado');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
     if (!formData.name || !formData.username || !formData.password) {
       setError('Todos los campos son obligatorios');
       return;
     }
 
-    const existing = storageService.getUsers().find(u => u.username === formData.username);
-    if (existing) {
-      setError('El nombre de usuario ya está registrado');
-      return;
+    try {
+      const email = `${formData.username.toLowerCase()}@sigai.local`;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
+      const firebaseUser = userCredential.user;
+
+      const newUser: User = {
+        id: firebaseUser.uid,
+        name: formData.name,
+        username: formData.username,
+        password: '', // Don't store plain password in Firestore
+        role: formData.username.toLowerCase() === 'admin' ? 'MASTER' : formData.role,
+        status: formData.username.toLowerCase() === 'admin' ? 'approved' : 'pending',
+        assignedBuildings: [],
+        assignedUnits: formData.username.toLowerCase() === 'admin' ? ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] : [],
+        phone: formData.phone,
+        isManto: formData.username.toLowerCase() === 'admin' ? true : formData.isManto,
+        leaveDays: []
+      };
+
+      await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+      
+      if (newUser.status === 'approved') {
+        onLogin(newUser);
+      } else {
+        setView('pending');
+      }
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('El nombre de usuario ya está registrado');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('El registro con Email/Contraseña no está habilitado en la consola de Firebase.');
+      } else {
+        setError('Error al registrar el usuario');
+      }
     }
-
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      name: formData.name,
-      username: formData.username,
-      password: formData.password,
-      role: formData.role,
-      status: 'pending',
-      assignedBuildings: [],
-      assignedUnits: [],
-      phone: formData.phone,
-      isManto: formData.isManto,
-      leaveDays: []
-    };
-
-    storageService.saveUser(newUser);
-    setView('pending');
   };
 
   if (view === 'pending') {
@@ -124,13 +217,35 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
           <form onSubmit={view === 'login' ? handleLogin : handleRegister} className="space-y-4">
             {error && <div className="p-4 bg-red-50 text-red-600 text-[10px] font-black rounded-2xl border border-red-100 uppercase">{error}</div>}
             
+            {view === 'login' && (
+              <button 
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full p-5 bg-white border-2 border-gray-100 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-sm flex items-center justify-center gap-3 active:scale-95 transition-all hover:border-gray-900 mb-6"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" referrerPolicy="no-referrer" />
+                Entrar con Google
+              </button>
+            )}
+
+            {view === 'login' && (
+              <div className="relative flex items-center justify-center mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-100"></div>
+                </div>
+                <span className="relative px-4 bg-white text-[9px] font-black text-gray-300 uppercase tracking-widest">O con Usuario</span>
+              </div>
+            )}
+
             {view === 'register' && (
               <div className="relative">
                 <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
                   type="text" 
                   placeholder="Nombre y Apellidos" 
-                  className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100"
+                  disabled={loading}
+                  className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100 disabled:opacity-50"
                   value={formData.name}
                   onChange={e => setFormData({...formData, name: e.target.value})}
                 />
@@ -142,7 +257,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
               <input 
                 type="text" 
                 placeholder="Nombre de Usuario" 
-                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100"
+                disabled={loading}
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100 disabled:opacity-50"
                 value={formData.username}
                 onChange={e => setFormData({...formData, username: e.target.value})}
               />
@@ -155,7 +271,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
               <input 
                 type="password" 
                 placeholder="Contraseña" 
-                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100"
+                disabled={loading}
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100 disabled:opacity-50"
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
               />
@@ -163,9 +280,37 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
 
             {/* isManto checkbox removed to keep registration simple as requested */}
 
-            <button type="submit" className="w-full p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 mt-4 hover:bg-black">
-              {view === 'login' ? 'Entrar' : 'Registrarse'} <ChevronRight className="w-4 h-4 text-yellow-400" />
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 mt-4 hover:bg-black disabled:opacity-50"
+            >
+              {loading ? 'Procesando...' : (view === 'login' ? 'Entrar' : 'Registrarse')} <ChevronRight className="w-4 h-4 text-yellow-400" />
             </button>
+
+            {view === 'login' && (
+              <button 
+                type="button"
+                onClick={() => {
+                  const masterUser: User = {
+                    id: 'emergency-admin',
+                    name: 'Admin Emergencia',
+                    username: 'admin',
+                    password: '',
+                    role: 'MASTER',
+                    status: 'approved',
+                    assignedBuildings: [],
+                    assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'],
+                    isManto: true,
+                    leaveDays: []
+                  };
+                  onLogin(masterUser);
+                }}
+                className="w-full p-4 bg-red-50 text-red-600 rounded-2xl font-black uppercase text-[8px] tracking-widest mt-4 border border-red-100 opacity-50 hover:opacity-100 transition-opacity"
+              >
+                ⚠️ Acceso de Emergencia (Sin Firebase)
+              </button>
+            )}
           </form>
         </div>
 

@@ -5,7 +5,7 @@ import {
   Users, ClipboardList, Camera, FileText, BookOpen, Map,
   ChevronRight, ArrowUpRight, ArrowDownRight, AlertCircle,
   TrendingUp, Settings, ShieldAlert, Timer, CheckCircle2,
-  Warehouse, FileSpreadsheet, HardHat, Fuel, Globe
+  Warehouse, FileSpreadsheet, HardHat, Fuel, Globe, Bell
 } from 'lucide-react';
 import { AppTab, User, ServiceType, Building, Role, UrgencyLevel } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
@@ -26,6 +26,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
   const requests = useMemo(() => storageService.getRequests(), []);
   const team = useMemo(() => storageService.getUsers(), []);
   const waterReadings = useMemo(() => storageService.getReadings('BASE_ALICANTE', 'agua'), []);
+  const notifications = useMemo(() => storageService.getNotifications().filter(n => !n.read).sort((a, b) => b.date.localeCompare(a.date)), []);
   
   const pendingTasksCount = tasks.filter(t => t.status !== 'Completada').length;
   const urgentRequests = requests.filter(r => r.urgency === 'Crítica' && r.status !== 'closed').length;
@@ -78,6 +79,26 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
   return (
     <div className="w-full max-w-sm mx-auto space-y-10 pb-12 animate-in fade-in duration-500">
       
+      {/* NOTIFICACIONES CRÍTICAS */}
+      {notifications.length > 0 && (
+        <div className="px-2 space-y-3">
+          {notifications.slice(0, 2).map(n => (
+            <div key={n.id} className="bg-red-50 border-2 border-red-100 rounded-3xl p-5 flex gap-4 animate-in slide-in-from-top-4">
+              <div className="bg-red-500 p-3 rounded-2xl text-white h-fit">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <div className="flex justify-between items-start mb-1">
+                  <h4 className="text-[11px] font-black uppercase text-red-900">{n.title}</h4>
+                  <button onClick={() => storageService.markNotificationAsRead(n.id)} className="text-[8px] font-black text-red-400 uppercase">Cerrar</button>
+                </div>
+                <p className="text-[10px] font-bold text-red-700 leading-relaxed uppercase tracking-tight">{n.message}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* HEADER UNIDAD */}
       <div className="relative overflow-hidden bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
         <div className="relative z-10">
@@ -85,9 +106,17 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
              <div className="bg-yellow-400 p-3 rounded-2xl">
                 <HardHat className="w-6 h-6 text-black" />
              </div>
-             <button onClick={() => onNavigate(AppTab.SETTINGS)} className="p-2 bg-white/10 rounded-xl">
-                <Settings className="w-5 h-5 text-gray-400" />
-             </button>
+             <div className="flex gap-2">
+               {notifications.length > 0 && (
+                 <div className="relative">
+                   <Bell className="w-5 h-5 text-yellow-400 animate-swing" />
+                   <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                 </div>
+               )}
+               <button onClick={() => onNavigate(AppTab.SETTINGS)} className="p-2 bg-white/10 rounded-xl">
+                  <Settings className="w-5 h-5 text-gray-400" />
+               </button>
+             </div>
           </div>
           <h2 className="text-3xl font-black uppercase tracking-tighter leading-none mb-2">
             {isMaster ? 'MÓDULO MAESTRO' : `UNIDAD ${user.role}`}

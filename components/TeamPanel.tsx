@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { Users, Calendar, CheckCircle, XCircle, ChevronRight, Phone, Mail, Award, Settings2, X, ChevronLeft, Plus, ShieldCheck, Briefcase, FileText, Edit2 } from 'lucide-react';
 import { User, LeaveEntry, LeaveType } from '../types';
-import { storageService } from '../services/storageService';
+import { storageService, BUILDINGS } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
 
 interface TeamPanelProps {
@@ -55,7 +55,6 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
         )}
       </div>
 
-      {/* Acceso Rápido Calendario Global */}
       <div className="px-2 space-y-4">
         <button 
           onClick={() => {
@@ -106,17 +105,18 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
             const available = isAvailable(tech);
             return (
               <div key={tech.id} className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-50 relative overflow-hidden group">
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className="relative">
-                    <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center text-yellow-400 text-xl font-black">
-                      {tech.name.charAt(0)}
+                <div className="flex items-center justify-between gap-4 relative z-10">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="relative">
+                      <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center text-yellow-400 text-xl font-black">
+                        {tech.name.charAt(0)}
+                      </div>
+                      <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-4 border-white flex items-center justify-center ${available ? 'bg-green-500' : 'bg-red-500'}`}>
+                        {available ? <CheckCircle className="w-3 h-3 text-white" /> : <XCircle className="w-3 h-3 text-white" />}
+                      </div>
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-4 border-white flex items-center justify-center ${available ? 'bg-green-500' : 'bg-red-500'}`}>
-                      {available ? <CheckCircle className="w-3 h-3 text-white" /> : <XCircle className="w-3 h-3 text-white" />}
-                    </div>
-                  </div>
                   
-                  <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <button 
                           onClick={() => {
@@ -128,63 +128,71 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
                           {tech.name}
                         </button>
                         {tech.role === 'MASTER' && <Award className="w-3 h-3 text-yellow-500" />}
+                      </div>
+                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-3">{tech.specialty || 'Técnico Polivalente'}</p>
+                    
+                      <div className="flex gap-2">
                         {(currentUser.role === 'MASTER' || currentUser.role === 'USAC') && (
                           <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingTech(tech);
-                            }}
-                            className="p-1.5 text-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors shadow-sm ml-1"
-                            title="Editar Técnico"
+                            onClick={() => setManagingTech(tech)}
+                            className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors flex items-center gap-2 text-[8px] font-black uppercase"
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
+                            <Calendar className="w-3 h-3" /> Calendario
                           </button>
                         )}
-                      </div>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-3">{tech.specialty || 'Técnico Polivalente'}</p>
-                    
-                    <div className="flex gap-2">
-                      {(currentUser.role === 'MASTER' || currentUser.role === 'USAC') && (
-                        <button 
-                          onClick={() => setManagingTech(tech)}
-                          className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors flex items-center gap-2 text-[8px] font-black uppercase"
-                        >
-                          <Calendar className="w-3 h-3" /> Calendario
-                        </button>
-                      )}
-                      {tech.phone && (
                         <div className="flex gap-1">
-                          <a href={`tel:${tech.phone}`} className="p-2 bg-gray-50 rounded-lg text-gray-400 hover:text-gray-900 transition-colors">
+                          <a 
+                            href={tech.phone ? `tel:${tech.phone}` : '#'} 
+                            onClick={(e) => !tech.phone && e.preventDefault()}
+                            className={`p-2 rounded-lg transition-colors ${tech.phone ? 'bg-gray-50 text-gray-400 hover:text-gray-900' : 'bg-gray-50 text-gray-200 cursor-not-allowed'}`}
+                            title={tech.phone ? 'Llamar' : 'Teléfono no disponible'}
+                          >
                             <Phone className="w-3 h-3" />
                           </a>
                           <button 
                             onClick={() => {
-                              const cleanPhone = tech.phone!.replace(/\D/g, '');
-                              window.open(`https://wa.me/${cleanPhone}`, '_blank');
+                              if (tech.phone) {
+                                const cleanPhone = tech.phone.replace(/\D/g, '');
+                                window.open(`https://wa.me/${cleanPhone}`, '_blank');
+                              }
                             }}
-                            className="p-2 bg-green-50 rounded-lg text-green-500 hover:bg-green-100 transition-colors"
-                            title="WhatsApp"
+                            className={`p-2 rounded-lg transition-colors ${tech.phone ? 'bg-green-50 text-green-500 hover:bg-green-100' : 'bg-gray-50 text-gray-200 cursor-not-allowed'}`}
+                            title={tech.phone ? 'WhatsApp' : 'WhatsApp no disponible'}
                           >
                             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current">
                               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.634 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
                             </svg>
                           </button>
                         </div>
-                      )}
-                      <button 
-                        onClick={() => window.location.href = `mailto:${tech.username}`}
-                        className="p-2 bg-blue-50 rounded-lg text-blue-500 hover:bg-blue-100 transition-colors"
-                      >
-                        <Mail className="w-3 h-3" />
-                      </button>
+                        <button 
+                          onClick={() => window.location.href = `mailto:${tech.username}`}
+                          className="p-2 bg-blue-50 rounded-lg text-blue-500 hover:bg-blue-100 transition-colors"
+                        >
+                          <Mail className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg mb-1 ${available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                      {available ? 'Disponible' : 'En Permiso'}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    {(currentUser.role === 'MASTER' || currentUser.role === 'USAC') && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTech(tech);
+                        }}
+                        className="p-2 text-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors shadow-sm"
+                        title="Editar Técnico"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <div className="text-right">
+                      <div className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg mb-1 ${available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                        {available ? 'Disponible' : 'En Permiso'}
+                      </div>
+                      <div className="text-[7px] text-gray-400 font-bold uppercase">Hoy</div>
                     </div>
-                    <div className="text-[7px] text-gray-400 font-bold uppercase">Hoy</div>
                   </div>
                 </div>
 
@@ -217,7 +225,6 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
         <Users className="absolute -right-4 -bottom-4 w-32 h-32 opacity-10 rotate-12" />
       </div>
 
-      {/* Modal de Gestión de Calendario Laboral */}
       {managingTech && (
         <AvailabilityModal 
           tech={managingTech} 
@@ -229,7 +236,6 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
         />
       )}
 
-      {/* Modal de Creación de Técnico */}
       {showCreateModal && (
         <CreateTechModal 
           onClose={() => setShowCreateModal(false)}
@@ -240,7 +246,6 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
         />
       )}
 
-      {/* Modal de Edición de Técnico */}
       {editingTech && (
         <EditTechModal 
           tech={editingTech}
@@ -252,7 +257,6 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
         />
       )}
 
-      {/* Modal de Solicitud de Día */}
       {requestingLeaveTech && (
         <LeaveRequestModal 
           tech={requestingLeaveTech}
@@ -260,7 +264,7 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
           onSuccess={() => {
             setAllUsers(storageService.getUsers());
             setRequestingLeaveTech(null);
-            setManagingTech(null); // Close calendar if open
+            setManagingTech(null);
           }}
         />
       )}
@@ -290,11 +294,12 @@ const CreateTechModal: React.FC<CreateTechModalProps> = ({ onClose, onCreated })
       password,
       role: 'USAC',
       status: 'approved',
-      assignedBuildings: storageService.getBuildings().map(b => b.id),
+      assignedBuildings: BUILDINGS.map(b => b.id),
       assignedUnits: ['USAC'],
       isManto: true,
       specialty,
-      phone
+      phone,
+      leaveDays: []
     };
 
     storageService.saveUser(newUser);
@@ -510,24 +515,9 @@ interface AvailabilityModalProps {
 }
 
 const ALICANTE_HOLIDAYS_2026 = [
-  '2026-01-01', // Año Nuevo
-  '2026-01-06', // Epifanía
-  '2026-03-19', // San José
-  '2026-04-02', // Jueves Santo
-  '2026-04-03', // Viernes Santo
-  '2026-04-06', // Lunes de Pascua
-  '2026-04-16', // Santa Faz (Alicante)
-  '2026-05-01', // Fiesta del Trabajo
-  '2026-06-24', // San Juan (Alicante)
-  '2026-08-15', // Asunción
-  '2026-10-09', // Día Comunitat Valenciana
-  '2026-10-12', // Fiesta Nacional
-  '2026-11-01', // Todos los Santos
-  '2026-11-02', // Lunes tras Todos los Santos
-  '2026-12-06', // Constitución
-  '2026-12-07', // Lunes tras Constitución
-  '2026-12-08', // Inmaculada
-  '2026-12-25', // Navidad
+  '2026-01-01', '2026-01-06', '2026-03-19', '2026-04-02', '2026-04-03', '2026-04-06', '2026-04-16',
+  '2026-05-01', '2026-06-24', '2026-08-15', '2026-10-09', '2026-10-12', '2026-11-01', '2026-11-02',
+  '2026-12-06', '2026-12-07', '2026-12-08', '2026-12-25'
 ];
 
 const AvailabilityModal: React.FC<AvailabilityModalProps> = ({ tech, isGeneral, allTechs, onClose, onUpdate, onRequestLeave }) => {
@@ -574,11 +564,6 @@ const AvailabilityModal: React.FC<AvailabilityModalProps> = ({ tech, isGeneral, 
               <p className="text-[9px] text-yellow-400 font-bold uppercase tracking-widest mt-1">Calendario Laboral Alicante</p>
             </div>
           </div>
-          <p className="text-[10px] text-white/60 font-medium leading-relaxed">
-            {isGeneral 
-              ? 'Vista general de disponibilidad del equipo USAC.' 
-              : 'Gestiona la disponibilidad. Los fines de semana y festivos están marcados automáticamente.'}
-          </p>
           {!isGeneral && (
             <button 
               onClick={onRequestLeave}
@@ -619,8 +604,6 @@ const AvailabilityModal: React.FC<AvailabilityModalProps> = ({ tech, isGeneral, 
               const isToday = getLocalDateString() === dateStr;
               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
               const isHoliday = ALICANTE_HOLIDAYS_2026.includes(dateStr);
-
-              // Check if anyone is on leave for general view
               const anyoneOnLeave = isGeneral && allTechs.some(u => u.leaveDays?.includes(dateStr));
 
               return (
@@ -699,24 +682,11 @@ interface LeaveRequestModalProps {
 }
 
 const LEAVE_TYPES: LeaveType[] = [
-  'Vacaciones',
-  'Asuntos Propios',
-  'Descanso Obligatorio',
-  'Descanso Adicional',
-  'Maniobras',
-  'Baja Médica',
-  'Enfermo Domicilio',
-  'Permisos Varios (Hospitalización/enfermedad familiar 1º o 2º grado, Otros permisos)',
-  'Conciliación Familiar',
-  'Comisión de Servicio',
-  'Ejercicios Varios',
-  'Servicio de Guardia',
-  'Jornada de Instrucción Prolongada',
-  'Jornada de Instrucción Continuada',
-  'Curso',
-  'Flexibilidad Horaria',
-  'Reducción de Jornada',
-  'Otro'
+  'Vacaciones', 'Asuntos Propios', 'Descanso Obligatorio', 'Descanso Adicional', 'Maniobras',
+  'Baja Médica', 'Enfermo Domicilio', 'Permisos Varios (Hospitalización/enfermedad familiar 1º o 2º grado, Otros permisos)',
+  'Conciliación Familiar', 'Comisión de Servicio', 'Ejercicios Varios', 'Servicio de Guardia',
+  'Jornada de Instrucción Prolongada', 'Jornada de Instrucción Continuada', 'Curso', 'Flexibilidad Horaria',
+  'Reducción de Jornada', 'Otro'
 ];
 
 const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ tech, onClose, onSuccess }) => {
