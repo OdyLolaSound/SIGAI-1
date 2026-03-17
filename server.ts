@@ -101,6 +101,28 @@ async function importHistoricalData() {
       await batch.commit();
       console.log("Historical data imported successfully.");
     }
+
+    // Ensure a default water account exists
+    const accountsRef = db.collection('water_accounts');
+    const accountsSnapshot = await accountsRef.limit(1).get();
+    if (accountsSnapshot.empty) {
+      console.log("Creating default water account...");
+      await accountsRef.doc('main-water-account').set({
+        id: 'main-water-account',
+        name: 'Contador General Base Alicante',
+        buildingId: 'BASE_ALICANTE',
+        webUser: 'USAC_ALICANTE',
+        status: 'conectada',
+        peakThresholdM3: 150,
+        peakThresholdPercent: 50,
+        selectors: {
+          userField: '#username',
+          passField: '#password',
+          submitBtn: '#login-btn',
+          tableRow: '.consumption-row'
+        }
+      });
+    }
   } catch (error) {
     console.error("Error importing historical data:", error);
   }
@@ -112,6 +134,7 @@ async function automateWaterSync() {
     const hours = now.getHours();
     const minutes = now.getMinutes();
 
+    // Run once a day at 00:00
     if (hours === 0 && minutes < 5) {
       console.log("Starting automated water sync at 00:00...");
       
@@ -150,10 +173,9 @@ async function automateWaterSync() {
           };
 
           await readingsRef.doc(readingId).set(newReading);
-          console.log(`Automated reading saved: ${newValue} m3 (+${consumption})`);
+          console.log(`Automated water reading saved: ${newValue} m3 (+${consumption})`);
 
           if (consumption > 150) {
-            console.log("ALERT: Water alteration detected!");
             await db.collection('notifications').add({
               id: crypto.randomUUID(),
               userId: 'all',
@@ -169,6 +191,166 @@ async function automateWaterSync() {
     }
   } catch (error) {
     console.error("Error in automated water sync:", error);
+  }
+}
+
+async function automateGasoilTelemetry() {
+  try {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // Simulate sensor update every 4 hours
+    if (hours % 4 === 0 && minutes < 5) {
+      console.log("Updating Gasoil telemetry sensors...");
+      const tanksRef = db.collection('gasoil_tanks');
+      const snapshot = await tanksRef.get();
+
+      for (const doc of snapshot.docs) {
+        const tank = doc.data();
+        // Simulate a small daily consumption (0.1% to 0.5% every 4 hours)
+        const consumptionPercent = (Math.random() * 0.4 + 0.1);
+        const newLevel = Math.max(0, tank.currentLevel - consumptionPercent);
+        const newLitres = (newLevel / 100) * tank.totalCapacity;
+
+        let alertStatus = 'normal';
+        if (newLevel < 15) alertStatus = 'critico';
+        else if (newLevel < 25) alertStatus = 'bajo';
+        else if (newLevel < 40) alertStatus = 'atencion';
+
+        await tanksRef.doc(doc.id).update({
+          currentLevel: Number(newLevel.toFixed(2)),
+          currentLitres: Math.round(newLitres),
+          lastReading: now.toISOString(),
+          alertStatus
+        });
+
+        // Add to readings history
+        await db.collection('gasoil_readings').add({
+          id: crypto.randomUUID(),
+          tankId: doc.id,
+          date: now.toISOString(),
+          percentage: Number(newLevel.toFixed(2)),
+          litres: Math.round(newLitres),
+          method: 'sensor',
+          userId: 'system-iot'
+        });
+
+        if (alertStatus === 'critico' || alertStatus === 'bajo') {
+          await db.collection('notifications').add({
+            id: crypto.randomUUID(),
+            userId: 'all',
+            title: `Nivel Bajo: ${tank.fullName}`,
+            message: `El depósito ${tank.fullName} está al ${newLevel.toFixed(1)}%. Se recomienda repostaje.`,
+            type: 'alert',
+            date: now.toISOString(),
+            read: false
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error in Gasoil telemetry:", error);
+  }
+}
+
+async function automateBoilerTelemetry() {
+  try {
+    const now = new Date();
+    const minutes = now.getMinutes();
+
+    // Update every 30 minutes
+    if (minutes % 30 < 5) {
+      console.log("Updating Boiler IoT sensors...");
+      const boilersRef = db.collection('boilers');
+      const snapshot = await boilersRef.get();
+
+      for (const doc of snapshot.docs) {
+        const boiler = doc.data();
+        if (boiler.status === 'averiada' || boiler.status === 'fuera_servicio') continue;
+
+        // Simulate normal operating ranges
+        const tempImpulsion = boiler.refTemps.impulsionMin + Math.random() * (boiler.refTemps.impulsionMax - boiler.refTemps.impulsionMin);
+        const tempRetorno = tempImpulsion - (5 + Math.random() * 10);
+        const pressure = boiler.refTemps.pressureMin + Math.random() * (boiler.refTemps.pressureMax - boiler.refTemps.pressureMin);
+        
+        const alerts = [];
+        if (pressure > boiler.refTemps.pressureMax) alerts.push('SOBREPRESIÓN');
+        if (pressure < boiler.refTemps.pressureMin) alerts.push('BAJA PRESIÓN');
+
+        await db.collection('boiler_readings').add({
+          id: crypto.randomUUID(),
+          boilerId: doc.id,
+          date: now.toISOString(),
+          tempImpulsion: Number(tempImpulsion.toFixed(1)),
+          tempRetorno: Number(tempRetorno.toFixed(1)),
+          pressure: Number(pressure.toFixed(2)),
+          isOn: true,
+          userId: 'system-iot',
+          userName: 'Sensor IoT Central',
+          alerts
+        });
+
+        if (alerts.length > 0) {
+          await db.collection('notifications').add({
+            id: crypto.randomUUID(),
+            userId: 'all',
+            title: `Alarma Caldera: ${boiler.code}`,
+            message: `Detectada anomalía en ${boiler.buildingName}: ${alerts.join(', ')}`,
+            type: 'alert',
+            date: now.toISOString(),
+            read: false
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error in Boiler telemetry:", error);
+  }
+}
+
+async function automateSaltInventory() {
+  try {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // Run once a day at 01:00
+    if (hours === 1 && minutes < 5) {
+      console.log("Updating Salt inventory levels...");
+      const stockRef = db.collection('salt_stock').doc('current');
+      const doc = await stockRef.get();
+      
+      if (doc.exists) {
+        const stock = doc.data();
+        // Simulate consumption: 0.5 to 1.5 sacks per day
+        const consumption = 0.5 + Math.random();
+        const newSacks = Math.max(0, stock.sacksAvailable - consumption);
+        
+        let status = 'normal';
+        if (newSacks < stock.criticalAlertLevel) status = 'critico';
+        else if (newSacks < stock.minAlertLevel) status = 'bajo';
+
+        await stockRef.update({
+          sacksAvailable: Number(newSacks.toFixed(1)),
+          status
+        });
+
+        if (status === 'critico' || status === 'bajo') {
+          await db.collection('notifications').add({
+            id: crypto.randomUUID(),
+            userId: 'all',
+            title: 'Stock de Sal Bajo',
+            message: `Quedan aproximadamente ${newSacks.toFixed(1)} sacos en el almacén central.`,
+            type: 'alert',
+            date: now.toISOString(),
+            read: false
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error in Salt inventory automation:", error);
   }
 }
 
@@ -227,8 +409,13 @@ async function startServer() {
     // Initial import
     importHistoricalData();
 
-    // Start automation interval (every 5 minutes to check for 00:00)
-    setInterval(automateWaterSync, 5 * 60 * 1000);
+    // Start automation interval (every 5 minutes to check for scheduled tasks)
+    setInterval(() => {
+      automateWaterSync();
+      automateGasoilTelemetry();
+      automateBoilerTelemetry();
+      automateSaltInventory();
+    }, 5 * 60 * 1000);
   });
 }
 

@@ -48,14 +48,9 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(true);
 
   useEffect(() => {
-    const initSync = async () => {
-      await storageService.init();
-      // After storage init, we wait for auth state
-    };
-    initSync();
-  }, []);
+    // Initialize storage immediately
+    storageService.init();
 
-  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         storageService.startListeners();

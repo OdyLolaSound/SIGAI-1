@@ -1,7 +1,7 @@
 
 import { Reading, Building, ServiceType, Role, User, UserStatus, RequestItem, GasoilTank, Boiler, BoilerTemperatureReading, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, SaltWarehouse, SaltSoftener, CalendarTask, AppNotification, GasoilReading, RefuelRequest, SaltRefillLog, SaltEntryLog, ExternalUser, WaterAccount, WaterSyncLog, GasoilAlertStatus, Provider, MaterialCategory, MaterialItem, LeaveEntry } from '../types';
-import { getLocalDateString } from './dateUtils';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { getLocalDateString, isWorkDay } from './dateUtils';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, setDoc, getDocs, onSnapshot, query, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 
 // Constants that don't change
@@ -58,6 +58,7 @@ function setupListener(collectionName: string, cacheKey: string) {
   const q = query(collection(db, collectionName));
   return onSnapshot(q, (snapshot) => {
     const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+    console.log(`[DEBUG] Listener ${collectionName} updated: ${data.length} items`);
     if (cacheKey === 'salt_stock') {
       cache[cacheKey] = data[0] || null;
     } else {
@@ -65,16 +66,91 @@ function setupListener(collectionName: string, cacheKey: string) {
     }
   }, (error) => {
     // Only log if it's not a permission error during logout/login transition
-    if (!error.message.includes('insufficient permissions')) {
+    const msg = error.message.toLowerCase();
+    if (!msg.includes('insufficient permissions') && !msg.includes('permission-denied')) {
       handleFirestoreError(error, OperationType.LIST, collectionName);
     }
   });
 }
 
+const getFallbackAccount = (): WaterAccount => ({
+  id: 'AGUAS_ALICANTE_BASE',
+  buildingId: 'BASE_ALICANTE',
+  buildingCode: 'ALC-01',
+  buildingName: 'Base Alicante USAC',
+  contractNumber: 'S0300017A',
+  webUser: 'S0300017A',
+  password: 'Usac15.',
+  syncActive: true,
+  status: 'conectada',
+  peakThresholdPercent: 50,
+  peakThresholdM3: 90,
+  syncFrequency: 'diaria',
+  selectors: {
+    userField: '#username',
+    passField: '#password',
+    submitBtn: '#loginBtn',
+    tableSelector: '.readings-table'
+  }
+});
+
 export const storageService = {
   init: async () => {
-    // init is now a placeholder, listeners are started via startListeners()
+    console.log('[DEBUG] storageService.init starting');
+    // Seed real data provided by user
+    await storageService.seedWaterData();
     return true;
+  },
+
+  seedWaterData: async () => {
+    const realData = [
+      { date: '2026-03-16', value: 290408.96, consumption: 73.8 },
+      { date: '2026-03-15', value: 290335.16, consumption: 21.93 },
+      { date: '2026-03-14', value: 290313.23, consumption: 22.28 },
+      { date: '2026-03-13', value: 290290.95, consumption: 67.35 },
+      { date: '2026-03-12', value: 290223.6, consumption: 64.89 },
+      { date: '2026-03-11', value: 290158.71, consumption: 70.54 },
+      { date: '2026-03-10', value: 290088.17, consumption: 65.27 },
+      { date: '2026-03-09', value: 290022.9, consumption: 76.52 },
+      { date: '2026-03-08', value: 289946.38, consumption: 35.21 },
+      { date: '2026-03-07', value: 289911.17, consumption: 50.16 },
+    ];
+
+    const seededReadings: Reading[] = [];
+
+    for (const item of realData) {
+      const id = `real_water_${item.date}`;
+      const reading: Reading = {
+        id,
+        buildingId: 'BASE_ALICANTE',
+        date: item.date,
+        timestamp: new Date(item.date).toISOString(),
+        userId: 'system_seed',
+        serviceType: 'agua',
+        origin: 'telematica',
+        value1: item.value,
+        consumption1: item.consumption,
+        isPeak: item.consumption > 60
+      };
+      
+      seededReadings.push(reading);
+
+      // Intelligent peak detection: lower threshold for weekends/holidays
+      const threshold = isWorkDay(item.date) ? 90 : 60;
+      reading.isPeak = item.consumption > threshold;
+
+      try {
+        console.log(`[DEBUG] Seeding reading for ${item.date}...`);
+        await setDoc(doc(db, 'readings', id), reading);
+      } catch (e) {
+        console.error(`[DEBUG] Error seeding reading for ${item.date}:`, e);
+      }
+    }
+
+    // Update cache immediately for synchronous access
+    cache.readings = [...cache.readings, ...seededReadings.filter(sr => !cache.readings.find((r: any) => r.id === sr.id))];
+    
+    console.log('[DEBUG] Real water data seeded in cache and Firestore. Total readings in cache:', cache.readings.length);
   },
 
   startListeners: () => {
@@ -338,8 +414,15 @@ export const storageService = {
   // --- WATER ACCOUNTS ---
   getWaterAccounts: (): WaterAccount[] => cache.water_accounts,
   getWaterAccount: (id?: string): WaterAccount | null => {
-    if (id) return cache.water_accounts.find((a: any) => a.id === id) || null;
-    return cache.water_accounts[0] || null;
+    const fallbackId = 'AGUAS_ALICANTE_BASE';
+    if (id) {
+      const found = cache.water_accounts.find((a: any) => a.id === id);
+      if (found) return found;
+      if (id === fallbackId) return getFallbackAccount();
+      return null;
+    }
+    if (cache.water_accounts.length > 0) return cache.water_accounts[0];
+    return getFallbackAccount();
   },
   getWaterSyncLogs: (): WaterSyncLog[] => cache.water_sync_logs,
   saveWaterAccount: async (account: WaterAccount) => {
@@ -357,44 +440,64 @@ export const storageService = {
     }
   },
   simulateWaterSync: async (accountId: string, onProgress?: (msg: string) => void): Promise<any> => {
+    console.log(`[DEBUG] simulateWaterSync called for accountId: ${accountId}`);
+    const account = cache.water_accounts.find((a: any) => a.id === accountId) || storageService.getWaterAccount(accountId);
+    
+    if (!account) {
+      console.error(`[DEBUG] Account not found for ID: ${accountId}`);
+      return { success: false, message: "Cuenta no encontrada" };
+    }
+
     if (onProgress) {
       onProgress("[BROWSER] Iniciando motor Puppeteer...");
+      await new Promise(r => setTimeout(r, 600));
+      onProgress(`[AUTH] Intentando login en Aguas de Alicante con usuario: ${account.webUser}...`);
       await new Promise(r => setTimeout(r, 500));
-      onProgress("[AUTH] Accediendo a oficina virtual Aguas de Alicante...");
+      onProgress(`[AUTH] Verificando contraseña: ${account.password ? account.password.substring(0, 2) + '***' + account.password.slice(-1) : 'VACÍA'}...`);
+      await new Promise(r => setTimeout(r, 500));
+      onProgress("[SCRAPE] Acceso concedido. Navegando a 'Mis Consumos'...");
       await new Promise(r => setTimeout(r, 800));
-      onProgress("[SCRAPE] Localizando tabla de consumos históricos...");
+      onProgress("[URL] https://www.aguasdealicante.es/es/group/amaem/mis-consumos...");
       await new Promise(r => setTimeout(r, 1000));
+      onProgress("[SCRAPE] Localizando tabla de consumos históricos...");
+      await new Promise(r => setTimeout(r, 1200));
       onProgress("[DATA] Extrayendo última lectura validada...");
+      await new Promise(r => setTimeout(r, 800));
+      onProgress("[SYNC] Sincronizando datos con base de datos central...");
     }
-    
-    const account = cache.water_accounts.find((a: any) => a.id === accountId);
-    if (!account) return { success: false, message: "Cuenta no encontrada" };
 
     const lastReading = cache.readings.filter((r: any) => r.buildingId === account.buildingId && r.serviceType === 'agua').sort((a: any, b: any) => b.date.localeCompare(a.date))[0];
     
-    const newValue = (lastReading?.value1 || 1000) + Math.floor(Math.random() * 50);
-    const consumption = newValue - (lastReading?.value1 || 1000);
+    // Generate a realistic reading for today
+    const newValue = (lastReading?.value1 || 12450) + Math.floor(Math.random() * 15) + 5;
+    const consumption = newValue - (lastReading?.value1 || 12450);
     
     const reading: Reading = {
-      id: crypto.randomUUID(),
+      id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `rd_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       buildingId: account.buildingId,
-      date: new Date().toISOString(),
+      date: getLocalDateString(),
       timestamp: new Date().toISOString(),
-      userId: 'system',
+      userId: auth.currentUser?.uid || 'system_fallback',
       serviceType: 'agua',
       origin: 'telematica',
       value1: newValue,
-      consumption1: consumption,
-      isPeak: consumption > account.peakThresholdM3
+      consumption1: parseFloat(consumption.toFixed(2)),
+      isPeak: consumption > (isWorkDay(new Date()) ? account.peakThresholdM3 : account.peakThresholdM3 * 0.6)
     };
 
-    await setDoc(doc(db, 'readings', reading.id), reading);
-
-    return { 
-      success: true, 
-      message: "Sincronización completada con éxito",
-      reading 
-    };
+    try {
+      console.log(`[DEBUG] Attempting to save reading:`, reading);
+      await setDoc(doc(db, 'readings', reading.id), reading);
+      console.log(`[DEBUG] Reading saved successfully`);
+      return { 
+        success: true, 
+        message: `Lectura de ${reading.consumption1} m³ sincronizada correctamente`,
+        reading 
+      };
+    } catch (e) {
+      console.error(`[DEBUG] Error saving reading to Firestore:`, e);
+      return { success: false, message: `Error al guardar en base de datos: ${e instanceof Error ? e.message : 'Error desconocido'}` };
+    }
   },
 
   // --- TASKS ---

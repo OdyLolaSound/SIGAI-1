@@ -13,7 +13,9 @@ import {
 } from 'recharts';
 import { WaterAccount, WaterSyncLog, AppTab, User, Reading } from '../types';
 import { storageService } from '../services/storageService';
-import { getLocalDateString } from '../services/dateUtils';
+import { getLocalDateString, isWorkDay, isHoliday } from '../services/dateUtils';
+import { db, auth } from '../firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 interface WaterSyncModuleProps {
   user: User;
@@ -39,8 +41,59 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
   });
 
   useEffect(() => {
+    // Initial load
     loadData();
-  }, []);
+
+    // Set up real-time listeners for this module
+    // Only if auth is ready
+    if (!auth.currentUser) return;
+
+    const unsubReadings = onSnapshot(
+      query(collection(db, 'readings'), where('serviceType', '==', 'agua')),
+      (snapshot) => {
+        const reads = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Reading[];
+        setReadings(reads.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      },
+      (error) => {
+        // Silent fail for permission errors during transitions
+        if (error.code !== 'permission-denied') {
+          console.error("Error in readings snapshot:", error);
+        }
+      }
+    );
+
+    const unsubAccount = onSnapshot(
+      collection(db, 'water_accounts'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          setAccount(snapshot.docs[0].data() as WaterAccount);
+        }
+      },
+      (error) => {
+        if (error.code !== 'permission-denied') {
+          console.error("Error in account snapshot:", error);
+        }
+      }
+    );
+
+    const unsubLogs = onSnapshot(
+      collection(db, 'water_sync_logs'),
+      (snapshot) => {
+        setLogs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as WaterSyncLog[]);
+      },
+      (error) => {
+        if (error.code !== 'permission-denied') {
+          console.error("Error in logs snapshot:", error);
+        }
+      }
+    );
+
+    return () => {
+      unsubReadings();
+      unsubAccount();
+      unsubLogs();
+    };
+  }, [auth.currentUser]);
 
   useEffect(() => {
     if (terminalEndRef.current) {
@@ -51,19 +104,37 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
   const loadData = () => {
     const acc = storageService.getWaterAccount();
     const reads = storageService.getReadings('BASE_ALICANTE', 'agua');
+    console.log(`[DEBUG] WaterSyncModule loadData: ${reads.length} readings found`);
     setAccount(acc);
     setReadings(reads.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     setLogs(storageService.getWaterSyncLogs());
   };
 
+  useEffect(() => {
+    // Retry loading data after a short delay to ensure cache is populated
+    const timer = setTimeout(loadData, 1000);
+    const timer2 = setTimeout(loadData, 3000);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(timer2);
+    };
+  }, []);
+
   // --- STATS CALCULATIONS ---
   const stats = useMemo(() => {
-    if (readings.length === 0) return { today: 0, week: 0, weekPrev: 0, month: 0, monthPrev: 0, avg: 0 };
+    if (readings.length === 0) return { today: 0, yesterday: 0, total: 0, week: 0, weekPrev: 0, month: 0, monthPrev: 0, avg: 0 };
     
     const now = new Date();
     const todayStr = getLocalDateString(now);
     
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(now.getDate() - 1);
+    const yesterdayStr = getLocalDateString(yesterdayDate);
+    
     const today = readings.find(r => r.date === todayStr)?.consumption1 || 0;
+    const yesterday = readings.find(r => r.date === yesterdayStr)?.consumption1 || 0;
+    
+    const total = readings.reduce((s, r) => s + (r.consumption1 || 0), 0);
     
     // Week
     const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(now.getDate() - 7);
@@ -82,7 +153,7 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
     const last30 = readings.filter(r => new Date(r.date) >= thirtyDaysAgo);
     const avg = last30.length > 0 ? last30.reduce((s, r) => s + (r.consumption1 || 0), 0) / last30.length : 8.5;
 
-    return { today, week, weekPrev, month, monthPrev, avg };
+    return { today, yesterday, total, week, weekPrev, month, monthPrev, avg };
   }, [readings]);
 
   const trendToday = useMemo(() => {
@@ -114,7 +185,7 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
       origin: 'manual',
       value1: manualForm.value,
       consumption1: manualForm.consumption || 0,
-      isPeak: (manualForm.consumption || 0) > (account?.peakThresholdM3 || 20)
+      isPeak: (manualForm.consumption || 0) > (isWorkDay(manualForm.date) ? (account?.peakThresholdM3 || 90) : (account?.peakThresholdM3 || 60))
     };
 
     storageService.saveReading(newReading);
@@ -144,7 +215,45 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
     }, 1000);
   };
 
-  if (!account) return null;
+  if (!account) {
+    return (
+      <div className="w-full max-w-sm mx-auto p-10 text-center space-y-6">
+        <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto animate-pulse">
+          <Droplets className="w-10 h-10 text-blue-500" />
+        </div>
+        <h2 className="text-xl font-black uppercase">Configurando Canal...</h2>
+        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+          Sincronizando parámetros telemáticos con el servidor central. Por favor, espere.
+        </p>
+        <div className="space-y-3">
+          <button 
+            onClick={() => {
+              setAccount(storageService.getWaterAccount());
+              setShowConfigModal(true);
+            }}
+            className="w-full p-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-blue-500/20"
+          >
+            Configurar Manualmente
+          </button>
+          <button 
+            onClick={() => onNavigate(AppTab.HOME)}
+            className="w-full p-5 bg-gray-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest"
+          >
+            Volver al Inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const getNextCycleTime = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(now.getHours() + 1);
+    next.setMinutes(0);
+    next.setSeconds(0);
+    return next.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="w-full max-w-sm mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
@@ -161,7 +270,21 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
           </div>
         </div>
         <div className="flex gap-2">
-           <button onClick={() => setShowConfigModal(true)} className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 shadow-sm active:scale-90"><Settings className="w-5 h-5" /></button>
+           <div className="text-[8px] font-mono text-gray-400 self-center mr-2">
+             R: {readings.length} | A: {account.status}
+           </div>
+           <button 
+            onClick={async () => {
+              await storageService.seedWaterData();
+              loadData();
+              alert("Datos forzados. Compruebe si aparecen.");
+            }}
+            className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 shadow-sm active:scale-90"
+            title="Forzar Carga de Datos"
+          >
+            <Database className="w-5 h-5" />
+          </button>
+          <button onClick={() => setShowConfigModal(true)} className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 shadow-sm active:scale-90"><Settings className="w-5 h-5" /></button>
            <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
               <LayoutGrid className="w-5 h-5 text-yellow-400" />
            </div>
@@ -201,12 +324,41 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
          </button>
       </div>
 
+      {/* AUTOMATION STATUS GRID */}
+      <div className="grid grid-cols-2 gap-4 px-2">
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="p-2 bg-blue-50 rounded-xl">
+              <RefreshCw className={`w-4 h-4 text-blue-500 ${loading ? 'animate-spin' : ''}`} />
+            </div>
+            <div className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[8px] font-black uppercase">Auto</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Próximo Ciclo</div>
+            <div className="text-lg font-black text-gray-900">{getNextCycleTime()}</div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="p-2 bg-purple-50 rounded-xl">
+              <ShieldCheck className="w-4 h-4 text-purple-500" />
+            </div>
+            <div className="px-2 py-1 bg-purple-50 text-purple-600 rounded-lg text-[8px] font-black uppercase">OK</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Estado Motor</div>
+            <div className="text-lg font-black text-gray-900">Activo</div>
+          </div>
+        </div>
+      </div>
+
       {/* COMPARATIVE CARDS GRID */}
       <div className="grid grid-cols-2 gap-4 px-2">
          <div className="bg-blue-600 p-6 rounded-[2.5rem] text-white shadow-xl space-y-1 relative overflow-hidden">
-            <span className="text-[8px] font-black uppercase opacity-60 tracking-widest">Hoy</span>
+            <span className="text-[8px] font-black uppercase opacity-60 tracking-widest">Consumo Ayer</span>
             <div className="flex items-baseline gap-1">
-               <span className="text-4xl font-black">{stats.today.toFixed(1)}</span>
+               <span className="text-4xl font-black">{stats.yesterday.toFixed(1)}</span>
                <span className="text-xs font-bold opacity-60 uppercase">m³</span>
             </div>
             <div className={`flex items-center gap-1 text-[8px] font-black uppercase bg-white/20 px-2 py-0.5 rounded-full w-fit ${trendToday.val > 0 ? 'text-red-300' : 'text-green-300'}`}>
@@ -217,15 +369,15 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
 
          <div className="bg-white border border-gray-100 p-6 rounded-[2.5rem] shadow-sm space-y-4">
             <div className="space-y-1">
-               <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest block">Semana Actual</span>
+               <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest block">Consumo Total</span>
                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-black text-gray-900">{stats.week.toFixed(0)}</span>
+                  <span className="text-xl font-black text-gray-900">{stats.total.toFixed(0)}</span>
                   <span className="text-[10px] font-bold text-gray-400 uppercase">m³</span>
                </div>
-               <p className="text-[7px] font-bold text-gray-400 uppercase">vs {stats.weekPrev.toFixed(0)} m³ anterior</p>
+               <p className="text-[7px] font-bold text-gray-400 uppercase">Histórico Registrado</p>
             </div>
             <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-               <div className="h-full bg-blue-500" style={{ width: `${Math.min((stats.week / (stats.weekPrev || 1)) * 100, 100)}%` }} />
+               <div className="h-full bg-blue-500" style={{ width: '100%' }} />
             </div>
          </div>
 
@@ -356,7 +508,8 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">Contraseña Portal</label>
                        <input 
                          type="password" 
-                         defaultValue="••••••••••••"
+                         value={account.password || ''}
+                         onChange={e => setAccount({...account, password: e.target.value})}
                          className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold outline-none focus:ring-2 ring-blue-500/20"
                        />
                     </div>

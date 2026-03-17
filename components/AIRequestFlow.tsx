@@ -31,6 +31,8 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
     urgency: UrgencyLevel;
     explanation: string;
     steps: string[];
+    isChronic?: boolean;
+    structuralSolution?: string;
   } | null>(null);
 
   // Chat States
@@ -110,7 +112,24 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
     try {
       const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
       const ai = new GoogleGenAI({ apiKey });
-      const parts: any[] = [{ text: `Actúa como un experto técnico de mantenimiento profesional y educado. Analiza esta incidencia: "${description}".` }];
+      
+      // Get historical context to detect chronic problems
+      const history = storageService.getRequests().slice(0, 20).map(r => ({
+        title: r.title,
+        desc: r.description,
+        cat: r.category,
+        date: r.date
+      }));
+
+      const parts: any[] = [{ 
+        text: `Actúa como un experto técnico de mantenimiento profesional y educado. 
+        Analiza esta incidencia: "${description}".
+        
+        CONTEXTO HISTÓRICO (Últimas 20 peticiones):
+        ${JSON.stringify(history)}
+        
+        Si detectas que este problema es recurrente o "crónico" (ha pasado varias veces de forma similar), indícalo como isChronic: true y propón una solución estructural permanente en structuralSolution.` 
+      }];
       
       if (image) {
         parts.push({
@@ -135,9 +154,11 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
               category: { type: Type.STRING },
               urgency: { type: Type.STRING },
               explanation: { type: Type.STRING },
-              steps: { type: Type.ARRAY, items: { type: Type.STRING } }
+              steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+              isChronic: { type: Type.BOOLEAN },
+              structuralSolution: { type: Type.STRING }
             },
-            required: ["category", "urgency", "explanation", "steps"]
+            required: ["category", "urgency", "explanation", "steps", "isChronic"]
           }
         }
       });
@@ -168,7 +189,9 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
       date: new Date().toISOString(),
       imageUrl: image || undefined,
       aiExplanation: aiAnalysis?.explanation,
-      aiSteps: aiAnalysis?.steps
+      aiSteps: aiAnalysis?.steps,
+      isChronic: aiAnalysis?.isChronic,
+      structuralSolution: aiAnalysis?.structuralSolution
     };
 
     storageService.saveRequest(newItem);
@@ -278,6 +301,21 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                       </div>
                     </div>
                     <div className="p-6 space-y-4">
+                      {aiAnalysis.isChronic && (
+                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl space-y-2">
+                          <div className="flex items-center gap-2 text-red-400">
+                            <ShieldAlert className="w-4 h-4" />
+                            <span className="text-[9px] font-black uppercase tracking-widest">Problema Crónico Detectado</span>
+                          </div>
+                          <p className="text-gray-300 text-[10px] leading-relaxed">
+                            Este problema se ha reportado anteriormente. La IA sugiere una **solución estructural**:
+                          </p>
+                          <p className="text-white text-[11px] font-bold italic">
+                            {aiAnalysis.structuralSolution}
+                          </p>
+                        </div>
+                      )}
+
                       <p className="text-white text-sm font-bold leading-relaxed">{aiAnalysis.explanation}</p>
                       
                       <div className="space-y-3">

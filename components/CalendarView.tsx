@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, User, CheckCircle2, AlertCircle, AlertTriangle, Send, Trash2, X, Building, Users } from 'lucide-react';
 import { CalendarTask, User as UserType, UrgencyLevel, AppTab, ExternalUser } from '../types';
 import { storageService } from '../services/storageService';
-import { getLocalDateString } from '../services/dateUtils';
+import { getLocalDateString, isHoliday } from '../services/dateUtils';
 import TaskForm from './TaskForm';
 
 interface CalendarViewProps {
@@ -137,14 +137,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
             const dayTasks = tasks.filter(t => t.startDate === dateStr);
             const isSelected = selectedDate.toDateString() === day.toDateString();
             const isToday = new Date().toDateString() === day.toDateString();
+            const isDayHoliday = isHoliday(day);
             return (
               <button 
                 key={dateStr}
                 onClick={() => setSelectedDate(new Date(day))}
-                className={`relative h-12 flex flex-col items-center justify-center rounded-xl transition-all active:scale-90 ${isSelected ? 'bg-gray-900 text-white shadow-xl scale-110 z-10' : isToday ? 'bg-yellow-50 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`relative h-12 flex flex-col items-center justify-center rounded-xl transition-all active:scale-90 ${isSelected ? 'bg-gray-900 text-white shadow-xl scale-110 z-10' : isToday ? 'bg-yellow-50 text-gray-900' : isDayHoliday ? 'bg-amber-50 text-amber-700' : 'text-gray-500 hover:bg-gray-50'}`}
               >
-                <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-gray-900'}`}>{day.getDate()}</span>
+                <span className={`text-[11px] font-black ${isSelected ? 'text-white' : isDayHoliday ? 'text-amber-700' : 'text-gray-900'}`}>{day.getDate()}</span>
                 <div className="flex flex-col items-center gap-0.5 mt-1">
+                  {isDayHoliday && (
+                    <div className="text-[6px] font-black uppercase text-amber-500 leading-none mb-0.5">Festivo</div>
+                  )}
                   {dayTasks.length > 0 && (
                     <div className="flex gap-0.5">
                       {dayTasks.slice(0, 3).map((t, i) => (
