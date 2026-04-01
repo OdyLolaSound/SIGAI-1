@@ -198,13 +198,32 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const startCamera = async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' },
+      setError(null);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("El navegador no soporta el acceso a la cámara.");
+      }
+
+      const constraints = { 
+        video: { 
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false 
-      });
+      };
+      
+      let s;
+      try {
+        s = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e) {
+        console.warn("Fallo con ideal, intentando básico", e);
+        s = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      
       setStream(s);
     } catch (err) {
-      setError("No se pudo acceder a la cámara. Asegúrate de dar permisos.");
+      console.error("Error de cámara:", err);
+      setError(`Error de cámara: ${err instanceof Error ? err.message : String(err)}. Asegúrate de dar permisos.`);
     }
   };
 
@@ -220,8 +239,15 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       <div className="relative flex-1 overflow-hidden">
         {error ? (
-          <div className="absolute inset-0 flex items-center justify-center p-8 text-center">
-            <p className="text-white font-bold uppercase text-xs">{error}</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gray-900">
+            <Camera className="w-12 h-12 text-gray-600 mb-4" />
+            <p className="text-white font-bold uppercase text-[10px] mb-6 leading-relaxed max-w-[200px]">{error}</p>
+            <button 
+              onClick={startCamera}
+              className="px-8 py-4 bg-yellow-400 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all"
+            >
+              Reintentar Cámara
+            </button>
           </div>
         ) : (
           <video 
@@ -229,6 +255,7 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             autoPlay 
             playsInline 
             muted
+            onLoadedMetadata={() => videoRef.current?.play()}
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
@@ -310,13 +337,32 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const startCamera = async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' },
+      setError(null);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("El navegador no soporta el acceso a la cámara.");
+      }
+
+      const constraints = { 
+        video: { 
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false 
-      });
+      };
+      
+      let s;
+      try {
+        s = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e) {
+        console.warn("Fallo con ideal, intentando básico", e);
+        s = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      
       setStream(s);
     } catch (err) {
-      setError("No se pudo acceder a la cámara.");
+      console.error("Error de cámara:", err);
+      setError(`Error de cámara: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -461,7 +507,27 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       {!showPreview ? (
         <div className="relative flex-1 overflow-hidden">
-          <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-60" />
+          {error ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gray-900">
+              <Camera className="w-12 h-12 text-gray-600 mb-4" />
+              <p className="text-white font-bold uppercase text-[10px] mb-6 leading-relaxed max-w-[200px]">{error}</p>
+              <button 
+                onClick={startCamera}
+                className="px-8 py-4 bg-yellow-400 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all"
+              >
+                Reintentar Cámara
+              </button>
+            </div>
+          ) : (
+            <video 
+              ref={videoRef} 
+              autoPlay 
+              playsInline 
+              muted 
+              onLoadedMetadata={() => videoRef.current?.play()}
+              className="absolute inset-0 w-full h-full object-cover opacity-60" 
+            />
+          )}
           
           {/* AR UI */}
           <div className="absolute inset-0 flex flex-col justify-between p-6 pointer-events-none">
