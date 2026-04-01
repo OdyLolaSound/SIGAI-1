@@ -18,6 +18,7 @@ import SalModule from './components/SalModule';
 import TemperatureModule from './components/TemperatureModule';
 import MaintenanceModule from './components/MaintenanceModule';
 import WaterSyncModule from './components/WaterSyncModule';
+import ToolsModule from './components/ToolsModule';
 import { AppTab, ServiceType, Building, User, Role } from './types';
 import { Zap, Droplets, Flame, ShieldCheck, ChevronRight, User as UserIcon, LogOut, Crown, PlusCircle, LayoutGrid, UserPlus, MessageSquare, Package, ClipboardList, Calendar, Users, Bell, Phone, CheckCircle, Info } from 'lucide-react';
 import { storageService, BUILDINGS } from './services/storageService';
@@ -135,7 +136,7 @@ const App: React.FC = () => {
     const authRequiredTabs = [
       AppTab.CALENDAR, AppTab.TEAM, AppTab.AI_REQUEST, AppTab.AI_MATERIAL, 
       AppTab.USAC_MANAGER, AppTab.GASOIL, AppTab.BOILERS, AppTab.SALT, 
-      AppTab.TEMPERATURES, AppTab.MAINTENANCE, AppTab.WATER_SYNC
+      AppTab.TEMPERATURES, AppTab.MAINTENANCE, AppTab.WATER_SYNC, AppTab.TOOLS
     ];
     
     if (!currentUser && authRequiredTabs.includes(activeTab)) {
@@ -278,7 +279,7 @@ const App: React.FC = () => {
   };
 
   const handleBack = () => {
-    if ([AppTab.AI_REQUEST, AppTab.AI_MATERIAL, AppTab.USAC_MANAGER, AppTab.CALENDAR, AppTab.TEAM, AppTab.GASOIL, AppTab.BOILERS, AppTab.SALT, AppTab.TEMPERATURES, AppTab.MAINTENANCE, AppTab.WATER_SYNC, AppTab.HISTORY].includes(activeTab)) {
+    if ([AppTab.AI_REQUEST, AppTab.AI_MATERIAL, AppTab.USAC_MANAGER, AppTab.CALENDAR, AppTab.TEAM, AppTab.GASOIL, AppTab.BOILERS, AppTab.SALT, AppTab.TEMPERATURES, AppTab.MAINTENANCE, AppTab.WATER_SYNC, AppTab.HISTORY, AppTab.TOOLS].includes(activeTab)) {
        setActiveTab(AppTab.HOME);
        setUnitMenuOpen(true);
        return;
@@ -342,6 +343,10 @@ const App: React.FC = () => {
 
     if (activeTab === AppTab.WATER_SYNC && currentUser) {
       return <WaterSyncModule user={currentUser} onNavigate={setActiveTab} />;
+    }
+
+    if (activeTab === AppTab.TOOLS) {
+      return <ToolsModule onBack={() => { setActiveTab(AppTab.HOME); setUnitMenuOpen(true); }} />;
     }
 
     if (activeTab === AppTab.TEAM && currentUser) {

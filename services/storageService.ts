@@ -199,6 +199,14 @@ export const storageService = {
   },
   saveReading: async (reading: Reading) => {
     try {
+      // Optimistic update
+      const index = cache.readings.findIndex((r: any) => r.id === reading.id);
+      if (index > -1) {
+        cache.readings[index] = reading;
+      } else {
+        cache.readings.push(reading);
+      }
+      
       await setDoc(doc(db, 'readings', reading.id), reading);
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'readings');
@@ -206,6 +214,9 @@ export const storageService = {
   },
   deleteReading: async (id: string) => {
     try {
+      // Optimistic update
+      cache.readings = cache.readings.filter((r: any) => r.id !== id);
+      
       await deleteDoc(doc(db, 'readings', id));
     } catch (e) {
       handleFirestoreError(e, OperationType.DELETE, 'readings');

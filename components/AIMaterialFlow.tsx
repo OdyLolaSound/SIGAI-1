@@ -344,17 +344,17 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
   return (
     <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col animate-in fade-in duration-300 overflow-hidden">
       {/* Header */}
-      <header className="p-6 flex items-center justify-between bg-gray-900 shrink-0 shadow-xl border-b border-white/5">
+      <header className="p-6 flex items-center justify-between bg-white shrink-0 shadow-sm border-b border-gray-100">
         <div className="flex items-center gap-4">
           <button 
             onClick={handleBack}
-            className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-all active:scale-90"
+            className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-900 hover:bg-gray-100 transition-all active:scale-90"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <div>
-            <h2 className="text-white font-black uppercase tracking-tighter text-xl leading-none">Solicitud Material</h2>
-            <p className="text-amber-500 text-[9px] font-black uppercase tracking-widest mt-1">Suministro v2.0</p>
+            <h2 className="text-gray-900 font-black uppercase tracking-tighter text-xl leading-none">Solicitud Material</h2>
+            <p className="text-blue-600 text-[9px] font-black uppercase tracking-widest mt-1">Suministro v2.0</p>
           </div>
         </div>
         <button onClick={onClose} className="p-2 text-gray-500 hover:text-white transition-colors">
@@ -527,7 +527,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
                 <button 
                   onClick={addItem}
                   disabled={!nuevoItem.name}
-                  className="w-full p-6 bg-gray-900 text-amber-500 rounded-[2rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+                  className="w-full p-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
                 >
                   <PlusCircle className="w-5 h-5" /> Añadir a la lista
                 </button>
@@ -597,7 +597,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
                           setMetodoEnvio('save');
                         }
                       }}
-                      className="flex-[2] p-8 bg-amber-500 text-black rounded-[2.5rem] font-black uppercase tracking-widest text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-4"
+                      className="flex-[2] p-8 bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-widest text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-4"
                     >
                       {items.filter(i => i.needsRequest).length > 0 ? (
                         <>Buscar Proveedores <ArrowRight className="w-6 h-6" /></>
@@ -639,7 +639,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${msg.role === 'usuario' ? 'bg-gray-100' : 'bg-blue-100'}`}>
                       {msg.role === 'usuario' ? '👤' : '🤖'}
                     </div>
-                    <div className={`p-6 rounded-[2rem] space-y-4 max-w-[85%] ${msg.role === 'usuario' ? 'bg-gray-900 text-white rounded-tr-none' : 'bg-blue-50 text-blue-900 rounded-tl-none'}`}>
+                    <div className={`p-6 rounded-[2rem] space-y-4 max-w-[85%] ${msg.role === 'usuario' ? 'bg-gray-100 text-gray-900 rounded-tr-none' : 'bg-blue-50 text-blue-900 rounded-tl-none'}`}>
                       <p className="text-xs font-bold leading-relaxed">{msg.content}</p>
                       
                       {msg.materiales && msg.materiales.length > 0 && (
@@ -870,7 +870,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
                 <button 
                   onClick={() => setStep('CONFIRMAR')}
                   disabled={!proveedorSeleccionado && !dividirProveedores}
-                  className="flex-[2] p-8 bg-gray-900 text-amber-500 rounded-[2.5rem] font-black uppercase tracking-widest text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-4 disabled:opacity-50"
+                  className="flex-[2] p-8 bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-widest text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-4 disabled:opacity-50"
                 >
                   Configurar Envío <ArrowRight className="w-6 h-6" />
                 </button>
@@ -895,7 +895,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
               <div className="bg-white border-2 border-gray-100 rounded-[3rem] overflow-hidden shadow-sm">
                 <div className="p-8 bg-gray-50 border-b border-gray-100">
                   <div className="flex items-center gap-4 mb-6">
-                    <div className="w-12 h-12 bg-gray-900 text-amber-500 rounded-2xl flex items-center justify-center">
+                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
                       <Truck className="w-6 h-6" />
                     </div>
                     <div>
@@ -925,7 +925,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
                           <button 
                             key={p}
                             onClick={() => setPedido({...pedido, prioridad: p})}
-                            className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${pedido.prioridad === p ? 'bg-gray-900 text-white shadow-lg' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                            className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${pedido.prioridad === p ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
                           >
                             {p}
                           </button>
@@ -991,9 +991,9 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
                   </button>
                   <button 
                     onClick={() => setMetodoEnvio('save')}
-                    className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 ${metodoEnvio === 'save' ? 'bg-white border-gray-900 shadow-xl scale-105' : 'bg-white border-gray-100 opacity-60'}`}
+                    className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 ${metodoEnvio === 'save' ? 'bg-white border-blue-600 shadow-xl scale-105' : 'bg-white border-gray-100 opacity-60'}`}
                   >
-                    <Save className={`w-6 h-6 ${metodoEnvio === 'save' ? 'text-gray-900' : 'text-gray-300'}`} />
+                    <Save className={`w-6 h-6 ${metodoEnvio === 'save' ? 'text-blue-600' : 'text-gray-300'}`} />
                     <span className="text-[8px] font-black uppercase tracking-widest">Guardar</span>
                   </button>
                 </div>
@@ -1008,7 +1008,7 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
                 </button>
                 <button 
                   onClick={() => handleFinalizar()}
-                  className="flex-[2] p-8 bg-gray-900 text-amber-500 rounded-[2.5rem] font-black uppercase tracking-widest text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-4"
+                  className="flex-[2] p-8 bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-widest text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-4"
                 >
                   {metodoEnvio === 'save' ? <Save className="w-6 h-6" /> : <Send className="w-6 h-6" />}
                   {metodoEnvio === 'save' ? 'Guardar Solicitud' : 'Enviar Pedido Oficial'}
@@ -1058,14 +1058,14 @@ const AIMaterialFlow: React.FC<AIMaterialFlowProps> = ({ user, onClose, onComple
 
               <button 
                 onClick={() => handleFinalizar(true, true)}
-                className="w-full p-6 bg-gray-900 hover:bg-black rounded-2xl text-left flex items-center gap-4 transition-all group"
+                className="w-full p-6 bg-blue-600 hover:bg-blue-700 rounded-2xl text-left flex items-center gap-4 transition-all group"
               >
-                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-amber-500 shadow-sm">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white shadow-sm">
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-black uppercase text-[10px] text-amber-500">Guardar y Generar PDF</p>
-                  <p className="text-[8px] font-bold text-gray-400 uppercase">Se guardará y descargará el documento</p>
+                  <p className="font-black uppercase text-[10px] text-white">Guardar y Generar PDF</p>
+                  <p className="text-[8px] font-bold text-blue-100 uppercase">Se guardará y descargará el documento</p>
                 </div>
               </button>
             </div>

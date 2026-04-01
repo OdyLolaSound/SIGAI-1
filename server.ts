@@ -4,25 +4,18 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import admin from "firebase-admin";
+import { getFirestore } from 'firebase-admin/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 import { WATER_HISTORY } from './src/services/waterHistoryData';
 
 // Initialize Firebase Admin
-// In this environment, we can usually initialize without explicit credentials
-// if running on Google Cloud, or we can use the project ID.
 if (admin.apps.length === 0) {
   admin.initializeApp({
     projectId: firebaseConfig.projectId
   });
 }
 
-const db = admin.firestore();
-if (firebaseConfig.firestoreDatabaseId) {
-  // If a specific database ID is provided in the config
-  // Note: Standard firebase-admin might not support databaseId in initializeApp 
-  // for all versions, but we can try to get the specific database if needed.
-  // For now, we'll use the default or the one associated with the project.
-}
+const db = getFirestore(firebaseConfig.firestoreDatabaseId);
 
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
@@ -121,6 +114,81 @@ async function importHistoricalData() {
           submitBtn: '#login-btn',
           tableRow: '.consumption-row'
         }
+      });
+    }
+
+    // Seed Boilers if empty
+    const boilersRef = db.collection('boilers');
+    const boilersSnapshot = await boilersRef.limit(1).get();
+    if (boilersSnapshot.empty) {
+      console.log("Seeding default boilers...");
+      const defaultBoilers = [
+        {
+          id: 'E0007',
+          buildingId: 'E0007',
+          buildingCode: 'E0007',
+          buildingName: 'Vestuario de Mandos',
+          code: 'CAL-0007',
+          brand: 'Roca',
+          model: 'P-30',
+          powerKw: 45,
+          status: 'operativa',
+          refTemps: { impulsionMin: 60, impulsionMax: 85, pressureMin: 1.2, pressureMax: 2.5 }
+        },
+        {
+          id: 'E0010',
+          buildingId: 'E0010',
+          buildingCode: 'E0010',
+          buildingName: 'Vestuario GCG y GOE III',
+          code: 'CAL-0010',
+          brand: 'Ferroli',
+          model: 'SFL 3',
+          powerKw: 60,
+          status: 'operativa',
+          refTemps: { impulsionMin: 60, impulsionMax: 80, pressureMin: 1.5, pressureMax: 2.8 }
+        }
+      ];
+      for (const b of defaultBoilers) {
+        await boilersRef.doc(b.id).set(b);
+      }
+    }
+
+    // Seed Gasoil Tanks if empty
+    const tanksRef = db.collection('gasoil_tanks');
+    const tanksSnapshot = await tanksRef.limit(1).get();
+    if (tanksSnapshot.empty) {
+      console.log("Seeding default gasoil tanks...");
+      const defaultTanks = [
+        {
+          id: 'tank-1',
+          buildingId: 'E0007',
+          buildingCode: 'E0007',
+          buildingName: 'Vestuario de Mandos',
+          tankNumber: 1,
+          fullName: 'Depósito Vestuario Mandos',
+          totalCapacity: 2000,
+          currentLevel: 75,
+          currentLitres: 1500,
+          alertStatus: 'normal'
+        }
+      ];
+      for (const t of defaultTanks) {
+        await tanksRef.doc(t.id).set(t);
+      }
+    }
+    
+    // Seed Salt Stock if empty
+    const saltRef = db.collection('salt_stock').doc('current');
+    const saltDoc = await saltRef.get();
+    if (!saltDoc.exists) {
+      console.log("Seeding default salt stock...");
+      await saltRef.set({
+        sacksAvailable: 45,
+        kgPerSack: 25,
+        minAlertLevel: 20,
+        criticalAlertLevel: 10,
+        status: 'normal',
+        lastSupplier: 'Salinas de Torrevieja'
       });
     }
   } catch (error) {

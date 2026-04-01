@@ -26,16 +26,16 @@ const BoilersDashboard: React.FC<BoilersDashboardProps> = ({ user, onNavigate })
     <div className="w-full max-w-sm mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-gray-900 rounded-2xl shadow-xl">
-             <Flame className="w-6 h-6 text-orange-500" />
+          <div className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm">
+             <Flame className="w-6 h-6 text-tactical-orange" />
           </div>
           <div>
             <h2 className="text-3xl font-black uppercase tracking-tighter text-gray-900 leading-none">Calderas</h2>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Módulo Técnico SIGAI</p>
           </div>
         </div>
-        <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
-           <LayoutGrid className="w-5 h-5 text-yellow-400" />
+        <div className="w-12 h-12 bg-white border border-gray-100 rounded-2xl flex items-center justify-center shadow-sm active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
+           <LayoutGrid className="w-5 h-5 text-tactical-orange" />
         </div>
       </div>
 
@@ -77,24 +77,24 @@ const BoilersDashboard: React.FC<BoilersDashboardProps> = ({ user, onNavigate })
         </div>
 
         {/* RESUMEN DE ESTADO */}
-        <section className="bg-gray-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl relative overflow-hidden">
+        <section className="bg-white border border-gray-100 rounded-[2.5rem] p-8 text-gray-900 space-y-6 shadow-sm relative overflow-hidden">
            <div className="relative z-10">
               <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 mb-6">Estado de Instalaciones</h3>
               <div className="space-y-4">
                  {boilers.map(boiler => (
-                   <div key={boiler.id} className="flex items-center justify-between border-b border-white/5 pb-3">
+                   <div key={boiler.id} className="flex items-center justify-between border-b border-gray-50 pb-3">
                       <div>
-                        <div className="text-[10px] font-black uppercase text-gray-500">{boiler.buildingCode}</div>
-                        <div className="text-xs font-bold">{boiler.buildingName}</div>
+                        <div className="text-[10px] font-black uppercase text-gray-400">{boiler.buildingCode}</div>
+                        <div className="text-xs font-bold text-gray-900">{boiler.buildingName}</div>
                       </div>
-                      <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${boiler.status === 'operativa' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400 animate-pulse'}`}>
+                      <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${boiler.status === 'operativa' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600 animate-pulse'}`}>
                          {boiler.status.replace('_', ' ')}
                       </div>
                    </div>
                  ))}
               </div>
            </div>
-           <Flame className="absolute -right-10 -bottom-10 w-48 h-48 text-orange-500/10 rotate-12" />
+           <Flame className="absolute -right-10 -bottom-10 w-48 h-48 text-gray-50 rotate-12" />
         </section>
       </div>
     </div>

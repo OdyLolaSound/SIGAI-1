@@ -199,21 +199,21 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-gray-900/95 backdrop-blur-xl flex flex-col animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[60] bg-white/95 backdrop-blur-xl flex flex-col animate-in fade-in duration-300">
       {/* Header Asistente */}
-      <header className="p-6 flex items-center justify-between border-b border-white/10">
+      <header className="p-6 flex items-center justify-between border-b border-gray-100">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-yellow-400 rounded-2xl flex items-center justify-center shadow-lg">
             <MessageSquare className="w-5 h-5 text-black" />
           </div>
           <div>
-            <h2 className="text-white font-black uppercase tracking-tighter text-lg leading-none">Asistente SIGAI</h2>
-            <p className="text-yellow-400/60 text-[8px] font-black uppercase tracking-widest mt-1">Soporte Técnico con IA</p>
+            <h2 className="text-gray-900 font-black uppercase tracking-tighter text-lg leading-none">Asistente SIGAI</h2>
+            <p className="text-yellow-600 text-[8px] font-black uppercase tracking-widest mt-1">Soporte Técnico con IA</p>
           </div>
         </div>
         <button 
           onClick={onClose} 
-          className="p-3 bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-all active:scale-90"
+          className="p-3 bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-xl transition-all active:scale-90"
           title="Cerrar Asistente"
         >
           <X className="w-6 h-6" />
@@ -221,33 +221,32 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
       </header>
 
       <main className="flex-1 overflow-y-auto overscroll-contain p-6 flex flex-col items-center">
-        <div className="w-full max-w-sm space-y-8">
-          
+        <div className="w-full max-w-2xl">
           {step === 'INPUT' && (
             <div className="space-y-6 animate-in slide-in-from-bottom-5">
-              <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] space-y-4">
+              <div className="bg-gray-50 border border-gray-100 p-6 rounded-[2.5rem] space-y-4">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">¿Cuál es el problema?</label>
                 <textarea 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Ej: Hay una fuga de agua en el baño del bloque A..."
-                  className="w-full bg-transparent text-white text-lg font-bold outline-none resize-none h-32 placeholder:text-gray-700"
+                  className="w-full bg-transparent text-gray-900 text-lg font-bold outline-none resize-none h-32 placeholder:text-gray-300"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => cameraInputRef.current?.click()} className="flex flex-col items-center justify-center p-6 bg-white/5 border border-white/10 rounded-[2rem] text-white hover:bg-white/10 transition-all group">
-                  <Camera className="w-6 h-6 mb-2 text-yellow-400 group-hover:scale-110 transition-transform" />
+                <button onClick={() => cameraInputRef.current?.click()} className="flex flex-col items-center justify-center p-6 bg-gray-50 border border-gray-100 rounded-[2rem] text-gray-900 hover:bg-gray-100 transition-all group">
+                  <Camera className="w-6 h-6 mb-2 text-yellow-600 group-hover:scale-110 transition-transform" />
                   <span className="text-[9px] font-black uppercase">Cámara</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center p-6 bg-white/5 border border-white/10 rounded-[2rem] text-white hover:bg-white/10 transition-all group">
-                  <Upload className="w-6 h-6 mb-2 text-blue-400 group-hover:scale-110 transition-transform" />
+                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center p-6 bg-gray-50 border border-gray-100 rounded-[2rem] text-gray-900 hover:bg-gray-100 transition-all group">
+                  <Upload className="w-6 h-6 mb-2 text-blue-600 group-hover:scale-110 transition-transform" />
                   <span className="text-[9px] font-black uppercase">Archivo</span>
                 </button>
               </div>
 
               {image && (
-                <div className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-white/10 shadow-2xl">
+                <div className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-gray-100 shadow-2xl">
                   <img src={image} className="w-full h-full object-cover" />
                   <button onClick={() => setImage(null)} className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full"><X className="w-4 h-4" /></button>
                 </div>
@@ -263,7 +262,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                 
                 <button 
                   onClick={onClose}
-                  className="w-full p-4 text-gray-500 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:text-white transition-colors"
+                  className="w-full p-4 text-gray-400 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:text-gray-900 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" /> Cancelar y Volver
                 </button>
@@ -275,13 +274,13 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
             <div className="flex flex-col items-center justify-center py-20 space-y-6 text-center">
               <div className="relative">
                 <div className="w-24 h-24 border-4 border-yellow-400/20 rounded-full animate-ping absolute inset-0"></div>
-                <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center relative z-10 shadow-2xl border border-white/10">
-                  <Loader2 className="w-10 h-10 text-yellow-400 animate-spin" />
+                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center relative z-10 shadow-2xl border border-gray-100">
+                  <Loader2 className="w-10 h-10 text-yellow-500 animate-spin" />
                 </div>
               </div>
               <div>
-                <h3 className="text-white text-xl font-black uppercase tracking-tighter">Consultando Experto...</h3>
-                <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Clasificando incidencia y urgencia</p>
+                <h3 className="text-gray-900 text-xl font-black uppercase tracking-tighter">Consultando Experto...</h3>
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Clasificando incidencia y urgencia</p>
               </div>
             </div>
           )}
@@ -290,7 +289,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
             <div className="space-y-6 animate-in zoom-in-95 duration-500 pb-10">
               {!showChat ? (
                 <>
-                  <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden">
+                  <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
                     <div className="p-6 bg-yellow-400 flex items-center justify-between">
                       <div className="flex items-center gap-3 text-black">
                         <ShieldAlert className="w-6 h-6" />
@@ -302,28 +301,28 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                     </div>
                     <div className="p-6 space-y-4">
                       {aiAnalysis.isChronic && (
-                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl space-y-2">
-                          <div className="flex items-center gap-2 text-red-400">
+                        <div className="bg-red-50 border border-red-100 p-4 rounded-2xl space-y-2">
+                          <div className="flex items-center gap-2 text-red-600">
                             <ShieldAlert className="w-4 h-4" />
                             <span className="text-[9px] font-black uppercase tracking-widest">Problema Crónico Detectado</span>
                           </div>
-                          <p className="text-gray-300 text-[10px] leading-relaxed">
+                          <p className="text-gray-600 text-[10px] leading-relaxed">
                             Este problema se ha reportado anteriormente. La IA sugiere una **solución estructural**:
                           </p>
-                          <p className="text-white text-[11px] font-bold italic">
+                          <p className="text-red-700 text-[11px] font-bold italic">
                             {aiAnalysis.structuralSolution}
                           </p>
                         </div>
                       )}
 
-                      <p className="text-white text-sm font-bold leading-relaxed">{aiAnalysis.explanation}</p>
+                      <p className="text-gray-900 text-sm font-bold leading-relaxed">{aiAnalysis.explanation}</p>
                       
                       <div className="space-y-3">
-                        <p className="text-[10px] font-black text-yellow-400 uppercase tracking-widest">Pasos sugeridos:</p>
+                        <p className="text-[10px] font-black text-yellow-600 uppercase tracking-widest">Pasos sugeridos:</p>
                         {aiAnalysis.steps.map((step, i) => (
-                          <div key={i} className="flex gap-4 items-start bg-white/5 p-4 rounded-2xl border border-white/5">
-                            <div className="w-6 h-6 bg-yellow-400/10 text-yellow-400 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0">{i+1}</div>
-                            <p className="text-gray-300 text-[11px] font-medium leading-snug">{step}</p>
+                          <div key={i} className="flex gap-4 items-start bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <div className="w-6 h-6 bg-yellow-400/20 text-yellow-700 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0">{i+1}</div>
+                            <p className="text-gray-700 text-[11px] font-medium leading-snug">{step}</p>
                           </div>
                         ))}
                       </div>
@@ -333,7 +332,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                   <div className="space-y-4">
                     <button 
                       onClick={() => setShowChat(true)}
-                      className="w-full p-6 bg-blue-500 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all"
+                      className="w-full p-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all"
                     >
                       <MessageSquare className="w-5 h-5" /> Necesito más ayuda / Chat
                     </button>
@@ -341,13 +340,13 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                     <div className="grid grid-cols-2 gap-4">
                       <button 
                         onClick={() => createFormalRequest(true)}
-                        className="p-5 bg-green-500 text-white rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
+                        className="p-5 bg-green-600 text-white rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
                       >
                         <CheckCircle2 className="w-4 h-4" /> Solucionado
                       </button>
                       <button 
                         onClick={() => setStep('FINAL_CONFIRM')}
-                        className="p-5 bg-white/10 text-white rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
+                        className="p-5 bg-gray-100 text-gray-600 rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
                       >
                         <AlertCircle className="w-4 h-4" /> No puedo
                       </button>
@@ -355,7 +354,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                     
                     <button 
                       onClick={() => setStep('INPUT')}
-                      className="w-full p-2 text-gray-500 font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2"
+                      className="w-full p-2 text-gray-400 font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2"
                     >
                       <ArrowLeft className="w-3 h-3" /> Corregir descripción
                     </button>
@@ -364,45 +363,45 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
               ) : (
                 <div className="space-y-4 flex flex-col h-[78vh] animate-in slide-in-from-right-5 duration-500">
                   {/* Chat Header Info */}
-                  <div className="flex items-center gap-3 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/20">
+                  <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-100 rounded-2xl">
+                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/20">
                       <Bot className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-blue-400 text-[10px] font-black uppercase leading-none">Asistente Técnico</p>
-                      <p className="text-blue-400/60 text-[8px] font-bold uppercase tracking-widest mt-1">En línea • Soporte Educado</p>
+                      <p className="text-blue-700 text-[10px] font-black uppercase leading-none">Asistente Técnico</p>
+                      <p className="text-blue-600/60 text-[8px] font-bold uppercase tracking-widest mt-1">En línea • Soporte Educado</p>
                     </div>
                   </div>
 
                   {/* Messages Area */}
                   <div className="flex-1 overflow-y-auto overscroll-contain space-y-6 pr-2 scrollbar-hide">
-                    <div className="bg-yellow-400/5 border border-yellow-400/10 p-5 rounded-3xl relative overflow-hidden">
+                    <div className="bg-yellow-50 border border-yellow-100 p-5 rounded-3xl relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400/30"></div>
-                      <p className="text-yellow-400 text-[9px] font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <p className="text-yellow-700 text-[9px] font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                         <ShieldAlert className="w-3 h-3" /> Diagnóstico Inicial:
                       </p>
-                      <p className="text-gray-400 text-[11px] leading-relaxed font-medium italic">"{aiAnalysis.explanation}"</p>
+                      <p className="text-gray-600 text-[11px] leading-relaxed font-medium italic">"{aiAnalysis.explanation}"</p>
                     </div>
 
                     {chatMessages.map((msg, i) => (
                       <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-2`}>
                         <div className={`flex items-center gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
-                            msg.role === 'user' ? 'bg-blue-600' : 'bg-gray-800 border border-white/10'
+                            msg.role === 'user' ? 'bg-blue-600' : 'bg-gray-100 border border-gray-200'
                           }`}>
-                            {msg.role === 'user' ? <UserIcon className="w-3 h-3 text-white" /> : <Bot className="w-3 h-3 text-yellow-400" />}
+                            {msg.role === 'user' ? <UserIcon className="w-3 h-3 text-white" /> : <Bot className="w-3 h-3 text-yellow-600" />}
                           </div>
-                          <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
                             {msg.role === 'user' ? 'Tú' : 'Asistente'}
                           </span>
                         </div>
                         
-                        <div className={`max-w-[90%] p-5 rounded-3xl text-[12px] leading-relaxed shadow-2xl ${
+                        <div className={`max-w-[90%] p-5 rounded-3xl text-[12px] leading-relaxed shadow-sm ${
                           msg.role === 'user' 
-                            ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-tr-none' 
-                            : 'bg-white/5 text-gray-200 rounded-tl-none border border-white/10 backdrop-blur-sm'
+                            ? 'bg-blue-600 text-white rounded-tr-none' 
+                            : 'bg-gray-50 text-gray-800 rounded-tl-none border border-gray-100'
                         }`}>
-                          <div className="markdown-body prose prose-invert prose-sm max-w-none">
+                          <div className="markdown-body prose prose-sm max-w-none">
                             <Markdown>{msg.content}</Markdown>
                           </div>
                         </div>
@@ -412,12 +411,12 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                     {chatLoading && (
                       <div className="flex flex-col items-start gap-2 animate-pulse">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-lg bg-gray-800 border border-white/10 flex items-center justify-center">
-                            <Bot className="w-3 h-3 text-yellow-400" />
+                          <div className="w-6 h-6 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
+                            <Bot className="w-3 h-3 text-yellow-600" />
                           </div>
-                          <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Asistente</span>
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Asistente</span>
                         </div>
-                        <div className="bg-white/5 p-5 rounded-3xl rounded-tl-none border border-white/10 flex gap-2">
+                        <div className="bg-gray-50 p-5 rounded-3xl rounded-tl-none border border-gray-100 flex gap-2">
                           <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce"></div>
                           <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                           <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
@@ -428,7 +427,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                   </div>
 
                   {/* Input & Actions Area - Pushed to bottom */}
-                  <div className="mt-auto space-y-4 bg-gray-900/50 pt-4 border-t border-white/5">
+                  <div className="mt-auto space-y-4 bg-white/50 pt-4 border-t border-gray-100">
                     <div className="relative group">
                       <input 
                         type="text"
@@ -436,7 +435,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                         onChange={(e) => setChatInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                         placeholder="Escribe tu duda técnica aquí..."
-                        className="w-full bg-white/5 border border-white/10 p-5 pr-16 rounded-[2rem] text-white text-xs font-bold outline-none focus:border-yellow-400 focus:bg-white/10 transition-all placeholder:text-gray-600"
+                        className="w-full bg-gray-50 border border-gray-200 p-5 pr-16 rounded-[2rem] text-gray-900 text-xs font-bold outline-none focus:border-yellow-400 focus:bg-white transition-all placeholder:text-gray-400"
                       />
                       <button 
                         onClick={handleSendMessage}
@@ -450,13 +449,13 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                     <div className="grid grid-cols-2 gap-3 pb-2">
                       <button 
                         onClick={() => createFormalRequest(true)}
-                        className="p-4 bg-green-500/10 border border-green-500/20 text-green-400 rounded-2xl font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-2 hover:bg-green-500 hover:text-white transition-all active:scale-95"
+                        className="p-4 bg-green-50 border border-green-100 text-green-600 rounded-2xl font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-2 hover:bg-green-600 hover:text-white transition-all active:scale-95"
                       >
                         <CheckCircle2 className="w-3 h-3" /> Solucionado
                       </button>
                       <button 
                         onClick={() => setStep('FINAL_CONFIRM')}
-                        className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:scale-95"
+                        className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all active:scale-95"
                       >
                         <AlertCircle className="w-3 h-3" /> No puedo
                       </button>
@@ -464,7 +463,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
 
                     <button 
                       onClick={() => setShowChat(false)}
-                      className="w-full py-2 text-gray-600 font-black uppercase text-[8px] tracking-[0.2em] flex items-center justify-center gap-2 hover:text-gray-400 transition-colors"
+                      className="w-full py-2 text-gray-400 font-black uppercase text-[8px] tracking-[0.2em] flex items-center justify-center gap-2 hover:text-gray-600 transition-colors"
                     >
                       <ArrowLeft className="w-3 h-3" /> Volver al diagnóstico
                     </button>
@@ -477,25 +476,25 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
           {step === 'FINAL_CONFIRM' && (
             <div className="space-y-6 animate-in slide-in-from-bottom-5">
               <div className="text-center mb-6">
-                <div className="w-20 h-20 bg-blue-500/10 text-blue-500 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-blue-500/20">
+                <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
                   <Wrench className="w-10 h-10" />
                 </div>
-                <h3 className="text-white text-2xl font-black uppercase tracking-tight">Crear Petición Oficial</h3>
-                <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mt-2">Se notificará al equipo técnico USAC</p>
+                <h3 className="text-gray-900 text-2xl font-black uppercase tracking-tight">Crear Petición Oficial</h3>
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-2">Se notificará al equipo técnico USAC</p>
               </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-6 space-y-5">
-                <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Categoría</span>
-                  <span className="text-white font-black uppercase text-[10px]">{aiAnalysis?.category || 'General'}</span>
+              <div className="bg-gray-50 border border-gray-100 rounded-[2.5rem] p-6 space-y-5">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-4">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Categoría</span>
+                  <span className="text-gray-900 font-black uppercase text-[10px]">{aiAnalysis?.category || 'General'}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Urgencia</span>
-                  <span className="text-red-400 font-black uppercase text-[10px]">{aiAnalysis?.urgency || 'Media'}</span>
+                <div className="flex justify-between items-center border-b border-gray-200 pb-4">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Urgencia</span>
+                  <span className="text-red-600 font-black uppercase text-[10px]">{aiAnalysis?.urgency || 'Media'}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Unidad</span>
-                  <span className="text-white font-black uppercase text-[10px]">{user.role}</span>
+                <div className="flex justify-between items-center border-b border-gray-200 pb-4">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Unidad</span>
+                  <span className="text-gray-900 font-black uppercase text-[10px]">{user.role}</span>
                 </div>
               </div>
 
@@ -508,7 +507,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                 </button>
                 <button 
                   onClick={() => setStep('AI_SUGGESTION')}
-                  className="w-full p-4 text-gray-500 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+                  className="w-full p-4 text-gray-400 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" /> Volver atrás
                 </button>

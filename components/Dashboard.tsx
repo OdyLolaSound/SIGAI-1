@@ -53,27 +53,27 @@ const Dashboard: React.FC<DashboardProps> = ({ serviceType, building, role, onNa
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm transition-all hover:shadow-md">
+        <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm transition-all hover:border-gray-200">
           <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-2">Acumulada</div>
-          <div className="text-2xl font-black font-mono text-gray-900 leading-tight">
+          <div className="text-2xl font-black data-value text-gray-900 leading-tight">
             {last ? last.value1.toLocaleString('es-ES') : '0,0'}
           </div>
-          <div className="text-[10px] opacity-40 font-black uppercase mt-1">{unitStr}</div>
+          <div className="text-[10px] opacity-20 font-black uppercase mt-1">{unitStr}</div>
         </div>
         
-        <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm transition-all hover:shadow-md">
+        <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm transition-all hover:border-gray-200">
           <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-2">Hoy</div>
-          <div className="text-2xl font-black font-mono text-green-600 leading-tight">
+          <div className="text-2xl font-black data-value text-emerald-600 leading-tight">
             +{last?.consumption1 ? last.consumption1.toLocaleString('es-ES') : '0,0'}
           </div>
-          <div className="text-[10px] opacity-60 font-black uppercase mt-1 text-green-600/60">{unitStr}</div>
+          <div className="text-[10px] opacity-40 font-black uppercase mt-1 text-emerald-600/60">{unitStr}</div>
         </div>
       </div>
 
-      <div className="bg-gray-900 text-white p-6 rounded-[2.5rem] shadow-2xl overflow-hidden relative border border-white/5">
+      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm overflow-hidden relative border border-gray-100">
         <div className="flex items-center justify-between mb-8 relative z-10">
-          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Histórico</h3>
-          <TrendingUp className="w-4 h-4 text-yellow-400" />
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Histórico de Consumo</h3>
+          <TrendingUp className="w-4 h-4 text-tactical-orange" />
         </div>
 
         <div className="h-48 relative z-10">
@@ -86,16 +86,16 @@ const Dashboard: React.FC<DashboardProps> = ({ serviceType, building, role, onNa
                     <stop offset="95%" stopColor={accentColor[serviceType]} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff08" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#4b5563', fontSize: 9, fontWeight: 700}} dy={10} />
-                <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', fontSize: '10px', color: '#fff' }} itemStyle={{ color: accentColor[serviceType] }} />
-                <Area type="monotone" dataKey="c1" stroke={accentColor[serviceType]} strokeWidth={4} fillOpacity={1} fill="url(#colorMain)" animationDuration={1500} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#00000005" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 8, fontWeight: 800}} dy={10} />
+                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '16px', fontSize: '10px', color: '#000' }} itemStyle={{ color: accentColor[serviceType] }} />
+                <Area type="monotone" dataKey="c1" stroke={accentColor[serviceType]} strokeWidth={3} fillOpacity={1} fill="url(#colorMain)" animationDuration={1500} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center opacity-20 gap-3">
+            <div className="h-full flex flex-col items-center justify-center opacity-10 gap-3">
                <AlertCircle className="w-10 h-10" />
-               <p className="text-[10px] font-black uppercase tracking-widest">Esperando datos</p>
+               <p className="text-[10px] font-black uppercase tracking-widest">Esperando datos operativos</p>
             </div>
           )}
         </div>
@@ -104,22 +104,22 @@ const Dashboard: React.FC<DashboardProps> = ({ serviceType, building, role, onNa
       <div className="grid grid-cols-2 gap-4 mt-8">
         <button 
           onClick={() => onNavigate(AppTab.HISTORY)}
-          className="flex items-center justify-center gap-3 p-6 bg-gray-50 border border-gray-100 rounded-[2rem] font-black uppercase text-[10px] tracking-widest text-gray-600 active:scale-95 transition-all shadow-sm"
+          className="flex items-center justify-center gap-3 p-6 bg-white border border-gray-100 rounded-[2rem] font-black uppercase text-[10px] tracking-widest text-gray-600 active:scale-95 transition-all shadow-sm hover:bg-gray-50"
         >
-          <HistoryIcon className="w-4 h-4" /> Ver Historial
+          <HistoryIcon className="w-4 h-4" /> Historial
         </button>
         <button 
           onClick={() => onNavigate(AppTab.SCAN)}
-          className="flex items-center justify-center gap-3 p-6 bg-yellow-400 text-black rounded-[2rem] font-black uppercase text-[10px] tracking-widest active:scale-90 transition-all shadow-xl"
+          className="flex items-center justify-center gap-3 p-6 bg-tactical-orange text-black rounded-[2rem] font-black uppercase text-[10px] tracking-widest active:scale-90 transition-all shadow-lg shadow-tactical-orange/20"
         >
-          <Camera className="w-4 h-4" /> Registrar Consumo
+          <Camera className="w-4 h-4" /> Registrar
         </button>
       </div>
 
-      <div className="bg-blue-50/50 p-5 rounded-[2rem] flex gap-4 items-center border border-blue-100/30">
-        <Info className="w-5 h-5 text-blue-500" />
-        <p className="text-[9px] text-blue-800 font-bold uppercase leading-relaxed tracking-tight italic">
-          El control en {building.code} garantiza la operatividad.
+      <div className="bg-white p-5 rounded-[2rem] flex gap-4 items-center border border-gray-100 shadow-sm">
+        <Info className="w-5 h-5 text-tactical-orange" />
+        <p className="text-[9px] text-gray-500 font-bold uppercase leading-relaxed tracking-tight italic">
+          El control en {building.code} garantiza la operatividad de la unidad.
         </p>
       </div>
     </div>

@@ -44,26 +44,26 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onBa
   }, [user]);
 
   return (
-    <div className="flex flex-col min-h-screen max-w-md mx-auto bg-white shadow-2xl relative overflow-hidden">
+    <div className="flex flex-col min-h-screen max-w-md mx-auto bg-gray-50 shadow-2xl relative overflow-hidden text-gray-900">
       {/* Header Premium */}
       {!hideHeader && (
-        <header className={`p-5 sticky top-0 z-40 flex items-center justify-between border-b shadow-lg transition-all duration-500 ${isMaster ? 'bg-yellow-400 border-yellow-600' : 'bg-gray-900 border-white/5'}`}>
+        <header className={`p-5 sticky top-0 z-40 flex items-center justify-between border-b shadow-sm transition-all duration-500 ${isMaster ? 'bg-tactical-orange border-black/10' : 'bg-white border-gray-100'}`}>
           <div className="flex items-center gap-2">
             {goHome && (
-              <button onClick={goHome} className={`p-1.5 rounded-xl transition-colors ${isMaster ? 'bg-black/10 text-black hover:bg-black/20' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+              <button onClick={goHome} className={`p-2 rounded-xl transition-all active:scale-90 ${isMaster ? 'bg-black/10 text-black hover:bg-black/20' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                 <HomeIcon className="w-5 h-5" />
               </button>
             )}
             {onBack && (
-              <button onClick={onBack} className={`p-1.5 rounded-xl transition-colors ${isMaster ? 'bg-black/10 text-black hover:bg-black/20' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+              <button onClick={onBack} className={`p-2 rounded-xl transition-all active:scale-90 ${isMaster ? 'bg-black/10 text-black hover:bg-black/20' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                 <ChevronLeft className="w-5 h-5" />
               </button>
             )}
             <div className="flex items-center gap-2 ml-1">
-              <div className={`${isMaster ? 'bg-black' : 'bg-yellow-400'} p-1.5 rounded-lg shadow-inner`}>
-                {isMaster ? <Crown className="w-4 h-4 text-yellow-400" /> : <ShieldCheck className="w-4 h-4 text-black fill-black" />}
+              <div className={`${isMaster ? 'bg-black' : 'bg-tactical-orange'} p-1.5 rounded-lg shadow-md`}>
+                {isMaster ? <Crown className="w-4 h-4 text-tactical-orange" /> : <ShieldCheck className="w-4 h-4 text-black fill-black" />}
               </div>
-              <h1 className={`text-lg font-black tracking-tighter uppercase ${isMaster ? 'text-black' : 'text-white'}`}>
+              <h1 className={`text-lg font-black tracking-tighter uppercase ${isMaster ? 'text-black' : 'text-gray-900'}`}>
                 {isMaster ? 'MASTER' : 'SIGAI'}
               </h1>
             </div>
@@ -74,11 +74,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onBa
               <>
                 <button 
                   onClick={() => setActiveTab(AppTab.CALENDAR)}
-                  className={`p-2 rounded-xl relative border transition-all active:scale-95 ${isMaster ? 'bg-black text-yellow-400 border-black/20' : 'bg-white/10 text-white border-white/10'}`}
+                  className={`p-2.5 rounded-xl relative border transition-all active:scale-90 ${isMaster ? 'bg-black text-tactical-orange border-black/20' : 'bg-gray-100 text-gray-600 border-gray-200'}`}
                 >
                   <CalendarIcon className="w-5 h-5" />
                   {todayTasksCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[8px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-gray-900">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[8px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-white">
                       {todayTasksCount}
                     </span>
                   )}
@@ -86,11 +86,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onBa
 
                 <button 
                   onClick={() => setShowNotifications(true)}
-                  className={`p-2 rounded-xl relative border transition-all active:scale-95 ${isMaster ? 'bg-black text-yellow-400 border-black/20' : 'bg-white/10 text-white border-white/10'}`}
+                  className={`p-2.5 rounded-xl relative border transition-all active:scale-90 ${isMaster ? 'bg-black text-tactical-orange border-black/20' : 'bg-gray-100 text-gray-600 border-gray-200'}`}
                 >
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[8px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-gray-900">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[8px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-white">
                       {unreadCount}
                     </span>
                   )}
@@ -98,7 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onBa
 
                 <button 
                   onClick={() => setActiveTab(AppTab.SETTINGS)}
-                  className={`p-2 rounded-xl border transition-all active:scale-95 ${isMaster ? 'bg-black text-yellow-400 border-black/20' : 'bg-white/10 text-white border-white/10'}`}
+                  className={`p-2.5 rounded-xl border transition-all active:scale-90 ${isMaster ? 'bg-black text-tactical-orange border-black/20' : 'bg-gray-100 text-gray-600 border-gray-200'}`}
                 >
                   <UserIcon className="w-5 h-5" />
                 </button>

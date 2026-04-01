@@ -303,7 +303,8 @@ export enum AppTab {
   SALT = 'salt',
   TEMPERATURES = 'temperatures',
   MAINTENANCE = 'maintenance',
-  WATER_SYNC = 'water_sync'
+  WATER_SYNC = 'water_sync',
+  TOOLS = 'tools'
 }
 
 export interface Reading {

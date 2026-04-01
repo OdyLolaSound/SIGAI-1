@@ -92,15 +92,15 @@ const MaintenanceModule: React.FC<MaintenanceModuleProps> = ({ user, onNavigate 
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Intervenciones y Piezas</p>
           </div>
         </div>
-        <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
-           <LayoutGrid className="w-5 h-5 text-yellow-400" />
+        <div className="w-12 h-12 bg-white border border-gray-100 rounded-2xl flex items-center justify-center shadow-sm active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
+           <LayoutGrid className="w-5 h-5 text-tactical-orange" />
         </div>
       </div>
 
       {/* QUICK ACTION */}
       <div className="px-2">
-         <button onClick={() => { setSelectedBoilerId(''); setShowModal(true); }} className="w-full p-8 bg-gray-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest text-xs shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all">
-            <Wrench className="w-6 h-6 text-yellow-400" /> Registrar Reparación
+         <button onClick={() => { setSelectedBoilerId(''); setShowModal(true); }} className="w-full p-8 bg-white border border-gray-100 text-gray-900 rounded-[2.5rem] font-black uppercase tracking-widest text-xs shadow-sm flex items-center justify-center gap-4 active:scale-95 transition-all">
+            <Wrench className="w-6 h-6 text-tactical-orange" /> Registrar Reparación
          </button>
       </div>
 

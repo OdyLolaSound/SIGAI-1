@@ -83,8 +83,8 @@ const TemperatureModule: React.FC<TemperatureModuleProps> = ({ user, onNavigate 
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Control Térmico Diario</p>
           </div>
         </div>
-        <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
-           <LayoutGrid className="w-5 h-5 text-yellow-400" />
+        <div className="w-12 h-12 bg-white border border-gray-100 rounded-2xl flex items-center justify-center shadow-sm active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
+           <LayoutGrid className="w-5 h-5 text-tactical-orange" />
         </div>
       </div>
 

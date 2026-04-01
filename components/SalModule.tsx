@@ -125,8 +125,8 @@ const SalModule: React.FC<SalModuleProps> = ({ user, onNavigate }) => {
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Control Logístico de Almacén</p>
           </div>
         </div>
-        <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
-           <LayoutGrid className="w-5 h-5 text-yellow-400" />
+        <div className="w-12 h-12 bg-white border border-gray-100 rounded-2xl flex items-center justify-center shadow-sm active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
+           <LayoutGrid className="w-5 h-5 text-tactical-orange" />
         </div>
       </div>
 
@@ -134,7 +134,7 @@ const SalModule: React.FC<SalModuleProps> = ({ user, onNavigate }) => {
       <section className={`bg-white border-2 rounded-[2.5rem] p-8 shadow-sm transition-all relative overflow-hidden ${warehouse.status === 'critico' ? 'border-red-200' : 'border-gray-100'}`}>
          <div className="flex justify-between items-start mb-6 relative z-10">
             <div className="flex items-center gap-3">
-               <div className="p-3 bg-gray-900 text-white rounded-2xl shadow-lg">
+               <div className="p-3 bg-gray-50 border border-gray-100 text-gray-900 rounded-2xl shadow-sm">
                   <Warehouse className="w-6 h-6" />
                </div>
                <div>
@@ -176,41 +176,41 @@ const SalModule: React.FC<SalModuleProps> = ({ user, onNavigate }) => {
       </section>
 
       {/* QUICK REFILL FORM (REGISTRAR SALIDA) */}
-      <section className="bg-gray-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl">
+      <section className="bg-white border border-gray-100 rounded-[2.5rem] p-8 text-gray-900 space-y-6 shadow-sm">
          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black text-xs">+</div>
+            <div className="w-8 h-8 bg-tactical-orange rounded-xl flex items-center justify-center text-black font-black text-xs">+</div>
             <h3 className="text-sm font-black uppercase tracking-tighter">Registrar Relleno (Salida)</h3>
          </div>
          
          <div className="space-y-4">
             <div className="space-y-2">
-               <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest px-1">¿Dónde has echado la sal?</label>
+               <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest px-1">¿Dónde has echado la sal?</label>
                <select 
                  value={refillForm.softenerId} 
                  onChange={e => setRefillForm({...refillForm, softenerId: e.target.value})}
-                 className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white outline-none focus:ring-2 ring-yellow-400/20"
+                 className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-gray-900 outline-none focus:ring-2 ring-tactical-orange/20"
                >
-                  <option value="" className="text-black">Seleccionar Edificio...</option>
+                  <option value="" className="text-gray-400">Seleccionar Edificio...</option>
                   {softeners.map(s => (
-                    <option key={s.id} value={s.id} className="text-black">{s.buildingCode} - {s.buildingName}</option>
+                    <option key={s.id} value={s.id} className="text-gray-900">{s.buildingCode} - {s.buildingName}</option>
                   ))}
                </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
                <div className="space-y-2">
-                  <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest px-1">¿Cuántos sacos?</label>
-                  <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-1">
-                     <button onClick={() => setRefillForm(p => ({...p, sacks: Math.max(1, p.sacks-1)}))} className="w-10 h-10 flex items-center justify-center font-black text-yellow-400">-</button>
-                     <input type="number" readOnly value={refillForm.sacks} className="flex-1 bg-transparent text-center font-black text-sm outline-none" />
-                     <button onClick={() => setRefillForm(p => ({...p, sacks: p.sacks+1}))} className="w-10 h-10 flex items-center justify-center font-black text-yellow-400">+</button>
+                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest px-1">¿Cuántos sacos?</label>
+                  <div className="flex items-center bg-gray-50 border border-gray-100 rounded-2xl p-1">
+                     <button onClick={() => setRefillForm(p => ({...p, sacks: Math.max(1, p.sacks-1)}))} className="w-10 h-10 flex items-center justify-center font-black text-tactical-orange">-</button>
+                     <input type="number" readOnly value={refillForm.sacks} className="flex-1 bg-transparent text-center font-black text-sm outline-none text-gray-900" />
+                     <button onClick={() => setRefillForm(p => ({...p, sacks: p.sacks+1}))} className="w-10 h-10 flex items-center justify-center font-black text-tactical-orange">+</button>
                   </div>
                </div>
                <div className="flex items-end pb-1">
                   <button 
                     onClick={handleRefill}
                     disabled={!refillForm.softenerId || warehouse.sacksAvailable === 0}
-                    className="w-full p-4 bg-yellow-400 text-black rounded-2xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg disabled:opacity-30"
+                    className="w-full p-4 bg-tactical-orange text-black rounded-2xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg disabled:opacity-30 shadow-tactical-orange/20"
                   >
                     Confirmar Salida
                   </button>

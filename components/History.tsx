@@ -19,6 +19,8 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
   const [endDate, setEndDate] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   useEffect(() => {
     const sType = filterService === 'all' ? undefined : filterService;
     setReadings(storageService.getReadings(building?.id, sType).reverse());
@@ -63,11 +65,10 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("¿Eliminar registro oficial?")) {
-      storageService.deleteReading(id);
-      const sType = filterService === 'all' ? undefined : filterService;
-      setReadings(storageService.getReadings(building?.id, sType).reverse());
-    }
+    storageService.deleteReading(id);
+    const sType = filterService === 'all' ? undefined : filterService;
+    setReadings(storageService.getReadings(building?.id, sType).reverse());
+    setDeletingId(null);
   };
 
   const getServiceIcon = (type: ServiceType) => {
@@ -106,11 +107,11 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
         <div className="flex gap-2">
           <button 
             onClick={() => setShowFilters(!showFilters)} 
-            className={`p-3 rounded-xl shadow-lg active:scale-95 transition-all ${showFilters ? 'bg-yellow-400 text-black' : 'bg-white border border-gray-100 text-gray-400'}`}
+            className={`p-3 rounded-xl shadow-sm active:scale-95 transition-all ${showFilters ? 'bg-tactical-orange text-black' : 'bg-white border border-gray-100 text-gray-400'}`}
           >
             <Filter className="w-4 h-4" />
           </button>
-          <button onClick={exportToExcel} className="p-3 bg-gray-900 text-yellow-400 rounded-xl shadow-lg active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3">
+          <button onClick={exportToExcel} className="p-3 bg-white text-tactical-orange rounded-xl shadow-sm active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 border border-gray-100">
              <FileSpreadsheet className="w-4 h-4" /> Excel
           </button>
         </div>
@@ -125,7 +126,7 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
                 <button
                   key={type.id}
                   onClick={() => setFilterService(type.id)}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterService === type.id ? 'bg-gray-900 text-white shadow-md' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterService === type.id ? 'bg-tactical-orange text-black shadow-md' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}
                 >
                   {type.label}
                 </button>
@@ -140,7 +141,7 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
                 type="date" 
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-[11px] font-bold text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-[11px] font-bold text-gray-900 focus:ring-2 focus:ring-tactical-orange outline-none"
               />
             </div>
             <div className="space-y-2">
@@ -149,7 +150,7 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
                 type="date" 
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-[11px] font-bold text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-[11px] font-bold text-gray-900 focus:ring-2 focus:ring-tactical-orange outline-none"
               />
             </div>
           </div>
@@ -160,7 +161,7 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
               setStartDate('');
               setEndDate('');
             }}
-            className="w-full py-3 text-[9px] font-black text-red-500 uppercase tracking-widest border border-red-50 rounded-xl hover:bg-red-50 transition-colors"
+            className="w-full py-3 text-[9px] font-black text-red-500 uppercase tracking-widest border border-red-100 rounded-xl hover:bg-red-50 transition-colors"
           >
             Limpiar Filtros
           </button>
@@ -170,7 +171,7 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
       <div className="space-y-4">
         {filteredReadings.length === 0 ? (
           <div className="text-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-gray-100 flex flex-col items-center gap-4">
-            <Calendar className="w-12 h-12 text-gray-200" />
+            <Calendar className="w-12 h-12 text-gray-100" />
             <p className="text-[10px] font-black uppercase text-gray-300 tracking-widest">Sin registros para estos filtros</p>
           </div>
         ) : (
@@ -180,17 +181,17 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
             
             return (
               <div key={r.id} className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-sm relative overflow-hidden group">
-                {r.origin === 'telematica' && <div className="absolute top-0 right-0 p-1.5 bg-blue-500 rounded-bl-xl shadow-inner"><Globe className="w-4 h-4 text-white" /></div>}
-                {r.isPeak && <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />}
+                {r.origin === 'telematica' && <div className="absolute top-0 right-0 p-1.5 bg-blue-600 rounded-bl-xl shadow-inner"><Globe className="w-4 h-4 text-white" /></div>}
+                {r.isPeak && <div className="absolute top-0 left-0 w-1 h-full bg-red-600" />}
                 
                 <div className="flex justify-between items-start mb-4 border-b border-gray-50 pb-3">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
+                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-200" />
                         {new Date(r.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </span>
-                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${r.serviceType === 'luz' ? 'bg-yellow-100 text-yellow-700' : r.serviceType === 'agua' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${r.serviceType === 'luz' ? 'bg-tactical-orange/10 text-tactical-orange' : r.serviceType === 'agua' ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
                         {getServiceIcon(r.serviceType)}
                         <span className="text-[8px] font-black uppercase tracking-widest">
                           {r.serviceType}
@@ -199,14 +200,36 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
                     </div>
                     
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-tighter">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
                         {b?.name || r.buildingId}
                       </span>
                     </div>
                   </div>
-                  <button onClick={() => handleDelete(r.id)} className="text-red-200 hover:text-red-500 transition-colors ml-4">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {deletingId === r.id ? (
+                      <div className="flex items-center gap-2 animate-in slide-in-from-right-2">
+                        <button 
+                          onClick={() => handleDelete(r.id)}
+                          className="px-3 py-1.5 bg-red-600 text-white text-[8px] font-black uppercase rounded-lg shadow-lg shadow-red-600/20"
+                        >
+                          Confirmar
+                        </button>
+                        <button 
+                          onClick={() => setDeletingId(null)}
+                          className="p-1.5 bg-gray-100 text-gray-400 rounded-lg"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => setDeletingId(r.id)} 
+                        className="text-red-200 hover:text-red-500 transition-colors ml-4"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className={`grid ${isLuz ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
@@ -214,15 +237,15 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
                     <div className="text-[9px] font-black text-gray-400 uppercase mb-2">
                       {isLuz ? 'Lectura A' : r.serviceType === 'agua' ? 'Lectura m³' : 'Lectura'}
                     </div>
-                    <div className="text-xl font-black font-mono text-gray-900 leading-none">{r.value1.toLocaleString('es-ES')}</div>
-                    <div className="text-[10px] font-black text-green-600 mt-2 flex items-center gap-1">
+                    <div className="text-xl font-black data-value text-gray-900 leading-none">{r.value1.toLocaleString('es-ES')}</div>
+                    <div className="text-[10px] font-black text-emerald-600 mt-2 flex items-center gap-1">
                        <CheckCircle2 className="w-3 h-3" /> +{r.consumption1?.toLocaleString('es-ES')}
                     </div>
                   </div>
                   {isLuz && (
                     <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                       <div className="text-[9px] font-black text-gray-400 uppercase mb-2">Lectura B</div>
-                      <div className="text-xl font-black font-mono text-gray-900 leading-none">{r.value2?.toLocaleString('es-ES')}</div>
+                      <div className="text-xl font-black data-value text-gray-900 leading-none">{r.value2?.toLocaleString('es-ES')}</div>
                       <div className="text-[10px] font-black text-blue-600 mt-2 flex items-center gap-1">
                          <CheckCircle2 className="w-3 h-3" /> +{r.consumption2?.toLocaleString('es-ES')}
                       </div>
@@ -230,7 +253,7 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
                   )}
                 </div>
                 {r.note && (
-                  <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100 text-[9px] font-bold text-amber-800 italic">
+                  <div className="mt-4 p-3 bg-tactical-orange/5 rounded-xl border border-tactical-orange/10 text-[9px] font-bold text-tactical-orange/80 italic">
                     "{r.note}"
                   </div>
                 )}
@@ -249,7 +272,7 @@ const History: React.FC<HistoryProps> = ({ serviceType: initialServiceType, buil
             onNavigate(AppTab.HOME);
           }
         }}
-        className="w-full flex items-center justify-center gap-3 p-6 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase text-[11px] tracking-widest active:scale-95 transition-all shadow-xl mt-4"
+        className="w-full flex items-center justify-center gap-3 p-6 bg-white border border-gray-100 text-tactical-orange rounded-[2rem] font-black uppercase text-[11px] tracking-widest active:scale-95 transition-all shadow-sm mt-4"
       >
         <LayoutGrid className="w-4 h-4" /> {building ? 'Volver al Panel' : 'Volver al Inicio'}
       </button>

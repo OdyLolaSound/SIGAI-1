@@ -117,19 +117,19 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ onClose, onSave, initialDat
       <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
-        <div className="p-8 bg-gray-900 text-white flex justify-between items-center shrink-0">
+        <div className="p-8 bg-white border-b border-gray-100 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-black shadow-lg">
+            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-sm">
               <TruckIcon className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter leading-none">
                 {duplicate ? 'Actualizar Proveedor' : 'Nuevo Proveedor'}
               </h3>
-              <p className="text-amber-500 text-[9px] font-black uppercase tracking-widest mt-1">Gestión de Suministros</p>
+              <p className="text-blue-600 text-[9px] font-black uppercase tracking-widest mt-1">Gestión de Suministros</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-gray-50 rounded-xl transition-colors text-gray-400">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -254,7 +254,7 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ onClose, onSave, initialDat
                     key={cat.id}
                     type="button"
                     onClick={() => toggleCategory(cat.name)}
-                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${formData.categories?.includes(cat.name) ? 'bg-gray-900 text-amber-500 shadow-lg scale-105' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${formData.categories?.includes(cat.name) ? 'bg-blue-600 text-white shadow-lg scale-105' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
                   >
                     {cat.icon} {cat.name}
                   </button>
@@ -331,7 +331,7 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ onClose, onSave, initialDat
 
             <button 
               type="submit"
-              className="w-full p-6 bg-gray-900 text-amber-500 rounded-[2rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
+              className="w-full p-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
             >
               {duplicate ? <RefreshCw className="w-5 h-5" /> : <Save className="w-5 h-5" />}
               {duplicate ? 'Actualizar Ficha Proveedor' : 'Guardar Nuevo Proveedor'}

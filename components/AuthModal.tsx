@@ -173,19 +173,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
 
   if (view === 'pending') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-        <div className="w-full max-w-sm bg-white rounded-[2.5rem] p-10 text-center shadow-2xl relative">
-          <button onClick={onClose} className="absolute top-6 left-6 p-2 text-gray-400 hover:text-gray-900 transition-colors">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="w-full max-w-sm bg-white rounded-[2.5rem] p-10 text-center shadow-2xl relative border border-gray-100">
+          <button onClick={onClose} className="absolute top-6 left-6 p-2 text-gray-400 hover:text-gray-900 transition-all active:scale-90">
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-yellow-500" />
+          <div className="w-20 h-20 bg-tactical-orange/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-tactical-orange/20">
+            <AlertCircle className="w-10 h-10 text-tactical-orange" />
           </div>
-          <h2 className="text-xl font-black uppercase mb-3">Solicitud Enviada</h2>
-          <p className="text-xs text-gray-500 font-medium leading-relaxed mb-8">
-            Tu registro como técnico de <strong>{formData.role}</strong> está pendiente de validación central.
+          <h2 className="text-xl font-black uppercase mb-3 text-gray-900">Solicitud Enviada</h2>
+          <p className="text-xs text-gray-400 font-medium leading-relaxed mb-8">
+            Tu registro como técnico de <strong className="text-tactical-orange">{formData.role}</strong> está pendiente de validación central.
           </p>
-          <button onClick={onClose} className="w-full p-5 bg-gray-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-lg active:scale-95 transition-all">
+          <button onClick={onClose} className="w-full p-5 bg-tactical-orange text-black rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl active:scale-95 transition-all shadow-tactical-orange/20">
             Volver al Inicio
           </button>
         </div>
@@ -194,22 +194,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col relative border border-gray-100">
         <button 
           onClick={view === 'register' ? () => setView('login') : onClose} 
-          className="absolute top-8 left-8 p-2 text-gray-400 hover:text-gray-900 transition-colors z-10"
+          className="absolute top-8 left-8 p-2 text-gray-400 hover:text-gray-900 transition-all active:scale-90 z-10"
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
 
         <div className="p-10 pt-14">
           <div className="flex justify-center mb-8">
-            <div className="bg-gray-900 p-4 rounded-3xl shadow-xl rotate-3">
-               <ShieldCheck className="w-10 h-10 text-yellow-400 -rotate-3" />
+            <div className="bg-tactical-orange/10 p-4 rounded-3xl shadow-xl rotate-3 border border-tactical-orange/20">
+               <ShieldCheck className="w-10 h-10 text-tactical-orange -rotate-3" />
             </div>
           </div>
-          <h2 className="text-3xl font-black text-center uppercase tracking-tighter mb-1">
+          <h2 className="text-3xl font-black text-center uppercase tracking-tighter mb-1 text-gray-900">
             {view === 'login' ? 'Acceso SIGAI' : 'Registro Técnico'}
           </h2>
           <p className="text-center text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mb-10">Unidad: {initialRole}</p>
@@ -222,7 +222,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="w-full p-5 bg-white border-2 border-gray-100 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-sm flex items-center justify-center gap-3 active:scale-95 transition-all hover:border-gray-900 mb-6"
+                className="w-full p-5 bg-white border-2 border-gray-100 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-sm flex items-center justify-center gap-3 active:scale-95 transition-all hover:border-tactical-orange/30 mb-6"
               >
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" referrerPolicy="no-referrer" />
                 Entrar con Google
@@ -245,7 +245,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
                   type="text" 
                   placeholder="Nombre y Apellidos" 
                   disabled={loading}
-                  className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100 disabled:opacity-50"
+                  className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100 text-gray-900 disabled:opacity-50 transition-all"
                   value={formData.name}
                   onChange={e => setFormData({...formData, name: e.target.value})}
                 />
@@ -258,13 +258,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
                 type="text" 
                 placeholder="Nombre de Usuario" 
                 disabled={loading}
-                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100 disabled:opacity-50"
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100 text-gray-900 disabled:opacity-50 transition-all"
                 value={formData.username}
                 onChange={e => setFormData({...formData, username: e.target.value})}
               />
             </div>
-
-            {/* Phone field removed to keep registration simple as requested */}
 
             <div className="relative">
               <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -272,20 +270,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
                 type="password" 
                 placeholder="Contraseña" 
                 disabled={loading}
-                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-gray-900/10 text-[11px] font-bold border border-gray-100 disabled:opacity-50"
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100 text-gray-900 disabled:opacity-50 transition-all"
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
               />
             </div>
 
-            {/* isManto checkbox removed to keep registration simple as requested */}
-
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 mt-4 hover:bg-black disabled:opacity-50"
+              className="w-full p-6 bg-tactical-orange text-black rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 mt-4 hover:bg-tactical-orange/90 disabled:opacity-50 shadow-tactical-orange/20"
             >
-              {loading ? 'Procesando...' : (view === 'login' ? 'Entrar' : 'Registrarse')} <ChevronRight className="w-4 h-4 text-yellow-400" />
+              {loading ? 'Procesando...' : (view === 'login' ? 'Entrar' : 'Registrarse')} <ChevronRight className="w-4 h-4 text-black" />
             </button>
 
             {view === 'login' && (
@@ -314,13 +310,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
           </form>
         </div>
 
-        <div className="p-8 bg-gray-50 text-center flex flex-col gap-4">
+        <div className="p-8 bg-gray-50 text-center flex flex-col gap-4 border-t border-gray-100">
           {view === 'login' ? (
-            <button onClick={() => setView('register')} className="text-[10px] font-black uppercase text-gray-500 hover:text-gray-900 transition-colors flex items-center justify-center gap-2">
+            <button onClick={() => setView('register')} className="text-[10px] font-black uppercase text-gray-400 hover:text-tactical-orange transition-colors flex items-center justify-center gap-2">
               <UserPlus className="w-4 h-4" /> Solicitar Registro en {initialRole}
             </button>
           ) : (
-            <button onClick={() => setView('login')} className="text-[10px] font-black uppercase text-gray-500 hover:text-gray-900 transition-colors">
+            <button onClick={() => setView('login')} className="text-[10px] font-black uppercase text-gray-400 hover:text-tactical-orange transition-colors">
               Ya tengo una cuenta, entrar
             </button>
           )}

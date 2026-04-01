@@ -285,15 +285,15 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
             <Database className="w-5 h-5" />
           </button>
           <button onClick={() => setShowConfigModal(true)} className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 shadow-sm active:scale-90"><Settings className="w-5 h-5" /></button>
-           <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
-              <LayoutGrid className="w-5 h-5 text-yellow-400" />
+           <div className="w-12 h-12 bg-white border border-gray-100 rounded-2xl flex items-center justify-center shadow-sm active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
+              <LayoutGrid className="w-5 h-5 text-tactical-orange" />
            </div>
         </div>
       </div>
 
       {/* TERMINAL / DEBUG CONSOLE */}
       {showTerminal && (
-        <div className="bg-gray-950 rounded-[2rem] p-6 mx-2 border border-gray-800 shadow-2xl space-y-4 animate-in slide-in-from-top-4">
+        <div className="bg-gray-900 rounded-[2rem] p-6 mx-2 border border-gray-800 shadow-2xl space-y-4 animate-in slide-in-from-top-4">
            <div className="flex justify-between items-center border-b border-gray-800 pb-3">
               <div className="flex items-center gap-2">
                  <Terminal className="w-4 h-4 text-green-500" />
@@ -319,8 +319,8 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
             <div className={`w-3 h-3 rounded-full ${account.status === 'conectada' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
             <span className="text-[9px] font-black uppercase text-gray-500">{account.status === 'conectada' ? 'Telemando En Línea' : 'Error de Conexión'}</span>
          </div>
-         <button onClick={handleSync} disabled={loading} className="p-3 bg-gray-900 text-yellow-400 rounded-2xl flex items-center gap-2 text-[8px] font-black uppercase tracking-widest active:scale-95 disabled:opacity-50">
-            {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} {loading ? 'Escaneando...' : 'Analizar Web'}
+         <button onClick={handleSync} disabled={loading} className="p-3 bg-white border border-gray-100 text-gray-900 rounded-2xl flex items-center gap-2 text-[8px] font-black uppercase tracking-widest active:scale-95 disabled:opacity-50 shadow-sm">
+            {loading ? <RefreshCw className="w-3 h-3 animate-spin text-tactical-orange" /> : <RefreshCw className="w-3 h-3 text-tactical-orange" />} {loading ? 'Escaneando...' : 'Analizar Web'}
          </button>
       </div>
 

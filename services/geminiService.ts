@@ -220,3 +220,40 @@ export const extractProviderInfo = async (base64Image: string): Promise<Provider
     return null;
   }
 };
+
+export const askGeminiAboutData = async (pregunta: string, dataContext: any, historial: { role: string, content: string }[]): Promise<string> => {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+    const ai = new GoogleGenAI({ apiKey });
+    
+    const systemInstruction = `Actúa como el Asistente de Inteligencia de la USAC (SIGAI).
+    Tienes acceso a los datos actuales de la unidad (lecturas, tareas, solicitudes, personal).
+    
+    DATOS ACTUALES:
+    ${JSON.stringify(dataContext)}
+    
+    REGLAS:
+    1. Responde de forma concisa y profesional (estilo militar).
+    2. Si te preguntan por consumos, analiza las tendencias si hay datos suficientes.
+    3. Si te preguntan por tareas, prioriza las críticas.
+    4. Si no tienes datos para responder, admítelo y sugiere qué información falta.
+    5. Usa Markdown para dar formato a las respuestas (tablas, negritas, listas).
+    6. Idioma: Español.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [
+        ...historial.map(h => ({ role: h.role === 'asistente' ? 'model' : 'user', parts: [{ text: h.content }] })),
+        { role: 'user', parts: [{ text: pregunta }] }
+      ],
+      config: {
+        systemInstruction,
+      }
+    });
+
+    return response.text || "No he podido procesar la consulta.";
+  } catch (error) {
+    console.error("Error AI Data Query:", error);
+    return "Error en el sistema de inteligencia. Inténtelo de nuevo.";
+  }
+};

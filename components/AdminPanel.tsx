@@ -108,15 +108,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
 
       <div className="space-y-4">
         {filteredUsers.length === 0 ? (
-          <div className="text-center py-20 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100">
+          <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
              <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No hay usuarios para gestionar</p>
           </div>
         ) : (
           filteredUsers.map(user => (
-            <div key={user.id} className={`bg-white border rounded-[2.5rem] p-6 shadow-sm transition-all ${user.status === 'pending' ? 'border-yellow-200' : 'border-gray-100'}`}>
+            <div key={user.id} className={`bg-white border rounded-[2.5rem] p-6 shadow-sm transition-all ${user.status === 'pending' ? 'border-tactical-orange/30' : 'border-gray-100'}`}>
               <div className="flex items-center justify-between mb-4 gap-4">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className={`p-3 rounded-2xl ${user.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-gray-100 text-gray-600'}`}>
+                  <div className={`p-3 rounded-2xl ${user.status === 'pending' ? 'bg-tactical-orange/10 text-tactical-orange' : 'bg-gray-50 text-gray-400'}`}>
                     {user.role === 'MASTER' ? <Crown className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
                   </div>
                   <div className="text-left">
@@ -126,42 +126,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                           type="text" 
                           value={editForm.name} 
                           onChange={e => setEditForm({...editForm, name: e.target.value})}
-                          className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold"
+                          className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold text-gray-900 outline-none focus:border-tactical-orange"
                           placeholder="Nombre completo"
                         />
                         <input 
                           type="text" 
                           value={editForm.username} 
                           onChange={e => setEditForm({...editForm, username: e.target.value})}
-                          className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold"
+                          className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold text-gray-900 outline-none focus:border-tactical-orange"
                           placeholder="Email / Usuario"
                         />
                         <input 
                           type="text" 
                           value={editForm.phone} 
                           onChange={e => setEditForm({...editForm, phone: e.target.value})}
-                          className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold"
+                          className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold text-gray-900 outline-none focus:border-tactical-orange"
                           placeholder="Teléfono"
                         />
                         <div className="flex gap-2">
-                          <button onClick={() => saveDetails(user.id)} className="flex-1 p-2 bg-green-500 text-white rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                          <button onClick={() => saveDetails(user.id)} className="flex-1 p-2 bg-tactical-emerald text-black rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1 shadow-lg shadow-tactical-emerald/20">
                             <Save className="w-3 h-3" /> Guardar
                           </button>
-                          <button onClick={() => setEditingDetailsId(null)} className="flex-1 p-2 bg-gray-200 text-gray-600 rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                          <button onClick={() => setEditingDetailsId(null)} className="flex-1 p-2 bg-gray-100 text-gray-400 rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <XCircle className="w-3 h-3" /> Cancelar
                           </button>
                         </div>
                       </div>
                     ) : (
                       <>
-                        <div className="font-black uppercase text-sm leading-none mb-1 truncate" title={user.name}>
+                        <div className="font-black uppercase text-sm leading-none mb-1 truncate text-gray-900" title={user.name}>
                           {user.name}
                         </div>
                         <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex flex-wrap items-center gap-x-3 gap-y-1">
                           <span>Unidad: {user.role}</span>
                           <span className="flex items-center gap-1">
                             @{user.username}
-                            <button onClick={() => handleEmail(user.username)} className="text-blue-500 hover:scale-110 transition-transform">
+                            <button onClick={() => handleEmail(user.username)} className="text-tactical-orange hover:scale-110 transition-transform">
                               <Mail className="w-3 h-3" />
                             </button>
                           </span>
@@ -170,14 +170,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                             <a 
                               href={user.phone ? `tel:${user.phone}` : '#'} 
                               onClick={(e) => !user.phone && e.preventDefault()}
-                              className={`${user.phone ? 'text-gray-600' : 'text-gray-200 cursor-not-allowed'} hover:scale-110 transition-transform`}
+                              className={`${user.phone ? 'text-gray-400' : 'text-gray-200 cursor-not-allowed'} hover:scale-110 transition-transform`}
                               title={user.phone ? 'Llamar' : 'Teléfono no disponible'}
                             >
                               <Phone className="w-3 h-3" />
                             </a>
                             <button 
                               onClick={() => user.phone && handleWhatsApp(user.phone)} 
-                              className={`${user.phone ? 'text-green-500' : 'text-gray-200 cursor-not-allowed'} hover:scale-110 transition-transform`} 
+                              className={`${user.phone ? 'text-tactical-emerald' : 'text-gray-200 cursor-not-allowed'} hover:scale-110 transition-transform`} 
                               title={user.phone ? 'WhatsApp' : 'WhatsApp no disponible'}
                             >
                               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current">
@@ -191,13 +191,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <div className={`px-2 py-1 rounded-full text-[8px] font-black uppercase ${user.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                  <div className={`px-2 py-1 rounded-full text-[8px] font-black uppercase ${user.status === 'approved' ? 'bg-tactical-emerald/20 text-tactical-emerald' : 'bg-tactical-orange/20 text-tactical-orange'}`}>
                     {user.status === 'approved' ? 'Activo' : 'Pendiente'}
                   </div>
                   {editingDetailsId !== user.id && (isMaster || currentUser.role === 'USAC') && (
                     <button 
                       onClick={() => handleEditDetails(user)} 
-                      className="p-2 text-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors shadow-sm"
+                      className="p-2 text-tactical-orange bg-tactical-orange/10 rounded-lg hover:bg-tactical-orange/20 transition-all shadow-sm"
                       title="Editar Detalles"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -213,8 +213,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                     <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Unidades Autorizadas (Botones):</p>
                     <div className="grid grid-cols-2 gap-2">
                       {ROLES_LIST.map(role => (
-                        <button key={role} onClick={() => toggleUnit(role)} className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${tempUnits.includes(role) ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-gray-50 bg-gray-50 text-gray-400'}`}>
-                          <CheckCircle2 className={`w-3 h-3 ${tempUnits.includes(role) ? 'opacity-100' : 'opacity-20'}`} />
+                        <button key={role} onClick={() => toggleUnit(role)} className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${tempUnits.includes(role) ? 'border-tactical-orange/50 bg-tactical-orange/10 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-300'}`}>
+                          <CheckCircle2 className={`w-3 h-3 ${tempUnits.includes(role) ? 'text-tactical-orange opacity-100' : 'opacity-20'}`} />
                           <span className="text-[10px] font-black uppercase">{role}</span>
                         </button>
                       ))}
@@ -225,30 +225,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                     <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Edificios Autorizados (Lecturas):</p>
                     <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
                       {BUILDINGS.map(b => (
-                        <button key={b.id} onClick={() => toggleBuilding(b.id)} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${tempBuildings.includes(b.id) ? 'border-yellow-400 bg-yellow-50 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-400'}`}>
+                        <button key={b.id} onClick={() => toggleBuilding(b.id)} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${tempBuildings.includes(b.id) ? 'border-tactical-orange/50 bg-tactical-orange/10 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-300'}`}>
                           <div className="flex items-center gap-3">
                              <Building2 className="w-4 h-4" />
                              <span className="text-[10px] font-bold uppercase">{b.name} ({b.code})</span>
                           </div>
-                          {tempBuildings.includes(b.id) && <Check className="w-4 h-4" />}
+                          {tempBuildings.includes(b.id) && <Check className="w-4 h-4 text-tactical-orange" />}
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <button onClick={() => saveApproval(user.id)} className="w-full p-5 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase text-xs tracking-widest mt-2 shadow-xl active:scale-95 transition-all">
+                  <button onClick={() => saveApproval(user.id)} className="w-full p-5 bg-tactical-orange text-black rounded-[2rem] font-black uppercase text-xs tracking-widest mt-2 shadow-xl active:scale-95 transition-all shadow-tactical-orange/20">
                     Guardar Configuración de Acceso
                   </button>
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <button onClick={() => handleApprove(user.id)} className="flex-[2] p-3 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-colors">Gestionar</button>
+                  <button onClick={() => handleApprove(user.id)} className="flex-[2] p-3 bg-gray-50 text-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-100">Gestionar</button>
                   {isMaster && (
-                    <button onClick={() => handleResetPass(user.id)} title="Reset Password" className="p-3 bg-blue-50 text-blue-600 rounded-2xl active:scale-90 transition-all">
+                    <button onClick={() => handleResetPass(user.id)} title="Reset Password" className="p-3 bg-tactical-orange/10 text-tactical-orange rounded-2xl active:scale-90 transition-all border border-tactical-orange/20">
                       <Lock className="w-5 h-5" />
                     </button>
                   )}
-                  <button onClick={() => handleReject(user.id)} className="p-3 bg-red-50 text-red-500 rounded-2xl active:scale-90 transition-all"><UserX className="w-5 h-5" /></button>
+                  <button onClick={() => handleReject(user.id)} className="p-3 bg-red-50 text-red-600 rounded-2xl active:scale-90 transition-all border border-red-100"><UserX className="w-5 h-5" /></button>
                 </div>
               )}
             </div>

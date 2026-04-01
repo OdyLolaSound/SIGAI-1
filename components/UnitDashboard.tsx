@@ -5,7 +5,8 @@ import {
   Users, ClipboardList, Camera, FileText, BookOpen, Map,
   ChevronRight, ArrowUpRight, ArrowDownRight, AlertCircle,
   TrendingUp, Settings, ShieldAlert, Timer, CheckCircle2,
-  Warehouse, FileSpreadsheet, HardHat, Fuel, Globe, Bell
+  Warehouse, FileSpreadsheet, HardHat, Fuel, Globe, Bell,
+  Wrench
 } from 'lucide-react';
 import { AppTab, User, ServiceType, Building, Role, UrgencyLevel } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
@@ -271,6 +272,16 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
               >
                 <ClipboardList className="w-5 h-5" /> Panel Gestión de Prioridades
               </button>
+
+              {/* SECCIÓN: HERRAMIENTAS DE TRABAJO (SOLO USAC Y MASTER) */}
+              {(user.role === 'USAC' || user.role === 'MASTER') && (
+                <button 
+                  onClick={() => onNavigate(AppTab.TOOLS)}
+                  className="w-full p-6 bg-white border-2 border-gray-900 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all mt-4"
+                >
+                  <Wrench className="w-5 h-5" /> Herramientas de Trabajo
+                </button>
+              )}
             </div>
           </section>
         </>

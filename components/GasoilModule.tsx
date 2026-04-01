@@ -144,17 +144,17 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
           <h2 className="text-2xl font-black uppercase tracking-tighter text-gray-900 leading-none">Gestión Gasoil</h2>
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Control de Combustible USAC</p>
         </div>
-        <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
-           <LayoutGrid className="w-5 h-5 text-yellow-400" />
+        <div className="w-12 h-12 bg-white border border-gray-100 rounded-2xl flex items-center justify-center shadow-sm active:scale-95 transition-all" onClick={() => onNavigate(AppTab.HOME)}>
+           <LayoutGrid className="w-5 h-5 text-tactical-orange" />
         </div>
       </div>
 
       {/* QUICK ACTIONS */}
       <div className="grid grid-cols-2 gap-4 px-2">
-         <button onClick={() => { setReadingForm({ ...readingForm, tankId: '' }); setShowReadingModal(true); }} className="p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-[9px] shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-            <Plus className="w-4 h-4 text-yellow-400" /> Registrar Lectura
+         <button onClick={() => { setReadingForm({ ...readingForm, tankId: '' }); setShowReadingModal(true); }} className="p-6 bg-white border border-gray-100 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[9px] shadow-sm flex items-center justify-center gap-3 active:scale-95 transition-all hover:border-tactical-orange/30">
+            <Plus className="w-4 h-4 text-tactical-orange" /> Registrar Lectura
          </button>
-         <button onClick={() => setShowRefuelModal(true)} className="p-6 bg-amber-500 text-black rounded-[2rem] font-black uppercase tracking-widest text-[9px] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
+         <button onClick={() => setShowRefuelModal(true)} className="p-6 bg-amber-500 text-black rounded-[2rem] font-black uppercase tracking-widest text-[9px] shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-amber-600">
             <Fuel className="w-4 h-4" /> Solicitar Carga
          </button>
       </div>
@@ -258,16 +258,16 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
 
       {/* MODAL LECTURA */}
       {showReadingModal && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
            <div className="w-full max-w-sm bg-white rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-              <header className="p-6 bg-gray-900 text-white flex justify-between items-center shrink-0">
+              <header className="p-6 bg-white border-b border-gray-100 text-gray-900 flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center shadow-lg">
+                    <div className="w-10 h-10 bg-tactical-orange rounded-xl flex items-center justify-center shadow-md">
                        <Plus className="w-5 h-5 text-black" />
                     </div>
                     <h3 className="text-lg font-black uppercase tracking-tight">Nueva Lectura</h3>
                  </div>
-                 <button onClick={() => setShowReadingModal(false)} className="p-2 text-white/30 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                 <button onClick={() => setShowReadingModal(false)} className="p-2 text-gray-400 hover:text-gray-600 transition-colors"><X className="w-6 h-6" /></button>
               </header>
 
               <main className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -276,7 +276,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                     <select 
                       value={readingForm.tankId} 
                       onChange={(e) => setReadingForm({...readingForm, tankId: e.target.value})}
-                      className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold outline-none"
+                      className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold outline-none focus:border-tactical-orange transition-all"
                     >
                       <option value="">Seleccionar depósito...</option>
                       {tanks.map(t => (
@@ -287,17 +287,17 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
 
                  {selectedTank && (
                    <div className="space-y-6 animate-in slide-in-from-bottom-5">
-                      <div className="p-6 bg-gray-900 rounded-[2rem] text-white text-center">
-                         <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-4">Nivel Actual (%)</span>
+                      <div className="p-6 bg-gray-50 border border-gray-100 rounded-[2rem] text-gray-900 text-center">
+                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4">Nivel Actual (%)</span>
                          <input 
                             type="range" 
                             min="0" 
                             max="100" 
                             value={readingForm.percentage}
                             onChange={(e) => handlePercentageChange(parseInt(e.target.value))}
-                            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-yellow-400 mb-4"
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-tactical-orange mb-4"
                          />
-                         <div className="text-6xl font-black text-yellow-400 font-mono tracking-tighter">{readingForm.percentage}%</div>
+                         <div className="text-6xl font-black text-tactical-orange font-mono tracking-tighter">{readingForm.percentage}%</div>
                          <div className="mt-4 text-[11px] font-bold text-gray-400">≈ {readingForm.litres} Litros</div>
                       </div>
 
@@ -307,7 +307,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                             <select 
                               value={readingForm.method} 
                               onChange={(e) => setReadingForm({...readingForm, method: e.target.value as any})}
-                              className="w-full p-4 bg-gray-50 rounded-2xl text-[11px] font-bold outline-none"
+                              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold outline-none focus:border-tactical-orange transition-all"
                             >
                                <option value="visual">👁️ Visual / Reloj</option>
                                <option value="varilla">📏 Varilla de Medición</option>
@@ -321,7 +321,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                               placeholder="Indica anomalías..." 
                               value={readingForm.notes}
                               onChange={(e) => setReadingForm({...readingForm, notes: e.target.value})}
-                              className="w-full p-4 bg-gray-50 rounded-2xl text-[11px] font-medium outline-none h-24 resize-none"
+                              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-medium outline-none h-24 resize-none focus:border-tactical-orange transition-all"
                             />
                          </div>
                       </div>
@@ -333,7 +333,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                  <button 
                   onClick={submitReading}
                   disabled={!readingForm.tankId}
-                  className="w-full p-6 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-2xl active:scale-95 transition-all disabled:opacity-50"
+                  className="w-full p-6 bg-tactical-orange text-black rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-lg active:scale-95 transition-all disabled:opacity-50 shadow-tactical-orange/20"
                  >
                     Validar Lectura SIGAI
                  </button>
@@ -344,9 +344,9 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
 
       {/* MODAL REPOSTAJE */}
       {showRefuelModal && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
            <div className="w-full max-w-sm bg-white rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-              <header className="p-6 bg-amber-500 text-white flex justify-between items-center shrink-0">
+              <header className="p-6 bg-amber-500 text-black flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-3 text-black">
                     <Fuel className="w-6 h-6" />
                     <h3 className="text-lg font-black uppercase tracking-tight">Solicitud de Carga</h3>
@@ -370,7 +370,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                                 : [...refuelForm.selectedTankIds, t.id]
                             });
                           }}
-                          className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${refuelForm.selectedTankIds.includes(t.id) ? 'bg-amber-50 border-amber-400 text-amber-900' : 'bg-gray-50 border-gray-50 text-gray-400 opacity-60'}`}
+                          className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${refuelForm.selectedTankIds.includes(t.id) ? 'bg-amber-50 border-amber-400 text-amber-900' : 'bg-gray-50 border-gray-100 text-gray-400 opacity-60'}`}
                          >
                             <div className="flex flex-col items-start">
                                <span className="text-[9px] font-black uppercase">{t.buildingCode}</span>
@@ -391,7 +391,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                       <select 
                         value={refuelForm.priority}
                         onChange={(e) => setRefuelForm({...refuelForm, priority: e.target.value as any})}
-                        className="w-full p-4 bg-gray-50 rounded-2xl font-black uppercase text-[10px] outline-none"
+                        className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-black uppercase text-[10px] outline-none focus:border-amber-500 transition-all"
                       >
                          <option value="Baja">Baja</option>
                          <option value="Media">Media</option>
@@ -404,7 +404,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                       <select 
                         value={refuelForm.type}
                         onChange={(e) => setRefuelForm({...refuelForm, type: e.target.value as any})}
-                        className="w-full p-4 bg-gray-50 rounded-2xl font-black uppercase text-[10px] outline-none"
+                        className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-black uppercase text-[10px] outline-none focus:border-amber-500 transition-all"
                       >
                          <option value="manual">Manual</option>
                          <option value="emergencia">Emergencia</option>
@@ -412,7 +412,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                     </div>
                  </div>
 
-                 <div className="bg-amber-900 rounded-[2rem] p-8 text-white space-y-6">
+                 <div className="bg-gray-900 rounded-[2rem] p-8 text-white space-y-6 shadow-xl">
                     <div className="flex justify-between items-center">
                        <div>
                           <p className="text-[10px] font-black text-amber-500 uppercase mb-1">Total Estimado</p>
@@ -432,7 +432,7 @@ const GasoilModule: React.FC<GasoilModuleProps> = ({ user, onNavigate }) => {
                  <button 
                   onClick={submitRefuelRequest}
                   disabled={refuelForm.selectedTankIds.length === 0}
-                  className="w-full p-6 bg-amber-500 text-black rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-2xl active:scale-95 transition-all disabled:opacity-50"
+                  className="w-full p-6 bg-amber-500 text-black rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-lg active:scale-95 transition-all disabled:opacity-50"
                  >
                     Enviar Solicitud de Carga
                  </button>
