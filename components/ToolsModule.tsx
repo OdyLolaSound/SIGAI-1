@@ -199,8 +199,13 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const startCamera = async () => {
     try {
       setError(null);
+      
+      if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+        throw new Error("La cámara requiere una conexión segura (HTTPS).");
+      }
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("El navegador no soporta el acceso a la cámara.");
+        throw new Error("El navegador no soporta el acceso a la cámara o está bloqueado.");
       }
 
       const constraints = { 
@@ -338,8 +343,13 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const startCamera = async () => {
     try {
       setError(null);
+
+      if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+        throw new Error("La cámara requiere una conexión segura (HTTPS).");
+      }
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("El navegador no soporta el acceso a la cámara.");
+        throw new Error("El navegador no soporta el acceso a la cámara o está bloqueado.");
       }
 
       const constraints = { 

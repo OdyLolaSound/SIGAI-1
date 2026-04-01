@@ -7,7 +7,17 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 // Load Firebase configuration
 const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
-const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
+let firebaseConfig: any = { projectId: 'placeholder' };
+
+if (fs.existsSync(firebaseConfigPath)) {
+  try {
+    firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
+  } catch (e) {
+    console.error("Error parsing firebase-applet-config.json:", e);
+  }
+} else {
+  console.warn("firebase-applet-config.json not found. Using placeholder config.");
+}
 
 import { WATER_HISTORY } from './src/services/waterHistoryData.js';
 
@@ -18,7 +28,7 @@ if (admin.apps.length === 0) {
   });
 }
 
-const db = getFirestore(firebaseConfig.firestoreDatabaseId);
+const db = getFirestore(firebaseConfig.firestoreDatabaseId || '(default)');
 
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
@@ -460,19 +470,31 @@ async function startServer() {
     res.json(newUser);
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
+  // Vite middleware for development or fallback
+  const isProduction = process.env.NODE_ENV === "production";
+  const distExists = fs.existsSync(path.join(process.cwd(), "dist"));
+
+  if (isProduction && distExists) {
+    console.log("Serving production build from dist/");
     app.use(express.static("dist"));
     app.get("*", (req, res) => {
       res.sendFile(path.join(process.cwd(), "dist", "index.html"));
     });
+  } else {
+    console.log("Starting in development mode with Vite middleware...");
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.error("Failed to start Vite middleware. If this is production, ensure 'npm run build' was executed.", e);
+      app.get("*", (req, res) => {
+        res.status(500).send("Server configuration error: dist/ not found and Vite not available.");
+      });
+    }
   }
 
   app.listen(PORT, "0.0.0.0", () => {
