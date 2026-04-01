@@ -190,6 +190,12 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
   const startCamera = async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ 
@@ -197,7 +203,6 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         audio: false 
       });
       setStream(s);
-      if (videoRef.current) videoRef.current.srcObject = s;
     } catch (err) {
       setError("No se pudo acceder a la cámara. Asegúrate de dar permisos.");
     }
@@ -223,6 +228,7 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             ref={videoRef} 
             autoPlay 
             playsInline 
+            muted
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
@@ -296,6 +302,12 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
   const startCamera = async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ 
@@ -303,7 +315,6 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         audio: false 
       });
       setStream(s);
-      if (videoRef.current) videoRef.current.srcObject = s;
     } catch (err) {
       setError("No se pudo acceder a la cámara.");
     }
@@ -450,7 +461,7 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       {!showPreview ? (
         <div className="relative flex-1 overflow-hidden">
-          <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover opacity-60" />
+          <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-60" />
           
           {/* AR UI */}
           <div className="absolute inset-0 flex flex-col justify-between p-6 pointer-events-none">
