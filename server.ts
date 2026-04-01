@@ -1,12 +1,15 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import admin from "firebase-admin";
 import { getFirestore } from 'firebase-admin/firestore';
-import firebaseConfig from './firebase-applet-config.json';
-import { WATER_HISTORY } from './src/services/waterHistoryData';
+
+// Load Firebase configuration
+const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
+const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
+
+import { WATER_HISTORY } from './src/services/waterHistoryData.js';
 
 // Initialize Firebase Admin
 if (admin.apps.length === 0) {
@@ -459,6 +462,7 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
