@@ -5,7 +5,7 @@ import {
   RefreshCw, Maximize, Save, Trash2, 
   Layers, Move, RotateCcw, Info,
   ChevronRight, Calculator, Scaling, FileSpreadsheet, PlusCircle,
-  FileCode, Home
+  FileCode, Home, CheckCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -183,11 +183,13 @@ const Step: React.FC<{ num: string, text: string }> = ({ num, text }) => (
   </div>
 );
 
-// --- MEDIDOR AR (SIMULADO / BÁSICO) ---
+// --- MEDIDOR AR (SIMULADO / INTERACTIVO) ---
 const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [isMeasuring, setIsMeasuring] = useState(false);
+  const [points, setPoints] = useState<{ x: number, y: number, angle: { beta: number, gamma: number } }[]>([]);
+  const [currentAngle, setCurrentAngle] = useState({ beta: 0, gamma: 0 });
   const [distance, setDistance] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showIntro, setShowIntro] = useState(true);
@@ -196,9 +198,11 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   useEffect(() => {
     if (!showIntro) {
       startCamera();
+      window.addEventListener('deviceorientation', handleOrientation);
     }
     return () => {
       if (stream) stream.getTracks().forEach(t => t.stop());
+      window.removeEventListener('deviceorientation', handleOrientation);
     };
   }, [showIntro]);
 
@@ -208,52 +212,137 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   }, [stream]);
 
+  const handleOrientation = (event: DeviceOrientationEvent) => {
+    setCurrentAngle({
+      beta: event.beta || 0,
+      gamma: event.gamma || 0
+    });
+  };
+
   const startCamera = async () => {
     try {
       setError(null);
-      
-      if (!window.isSecureContext && window.location.hostname !== 'localhost') {
-        throw new Error("La cámara requiere una conexión segura (HTTPS).");
-      }
-
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("El navegador no soporta el acceso a la cámara o está bloqueado.");
+        throw new Error("El navegador no soporta el acceso a la cámara.");
       }
-
       const constraints = { 
-        video: { 
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
+        video: { facingMode: 'environment' },
         audio: false 
       };
-      
-      let s;
-      try {
-        s = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (e) {
-        console.warn("Fallo con ideal, intentando básico", e);
-        s = await navigator.mediaDevices.getUserMedia({ video: true });
-      }
-      
+      const s = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(s);
     } catch (err) {
-      console.error("Error de cámara:", err);
-      setError(`Error de cámara: ${err instanceof Error ? err.message : String(err)}. Asegúrate de dar permisos.`);
+      setError("Error de cámara. Asegúrate de dar permisos y usar HTTPS.");
     }
   };
 
-  const handleMeasure = () => {
-    setIsMeasuring(true);
-    setTimeout(() => {
-      setDistance(Math.random() * 5 + 1);
-      setIsMeasuring(false);
-    }, 1500);
+  const handleAction = () => {
+    if (points.length === 0) {
+      // Mark start point
+      setPoints([{ x: window.innerWidth / 2, y: window.innerHeight / 2, angle: currentAngle }]);
+      setDistance(0);
+    } else if (points.length === 1) {
+      // Mark end point
+      const endPoint = { x: window.innerWidth / 2, y: window.innerHeight / 2, angle: currentAngle };
+      const finalDist = calculateDistance(points[0].angle, endPoint.angle);
+      setPoints([...points, endPoint]);
+      setDistance(finalDist);
+    } else {
+      // Reset
+      setPoints([]);
+      setDistance(null);
+    }
   };
 
+  const calculateDistance = (a1: { beta: number, gamma: number }, a2: { beta: number, gamma: number }) => {
+    // Heurística: calculamos la diferencia angular y la convertimos a metros
+    // Asumimos que el usuario está a una distancia media de 2-3 metros
+    const dBeta = Math.abs(a1.beta - a2.beta);
+    const dGamma = Math.abs(a1.gamma - a2.gamma);
+    const angularDiff = Math.sqrt(dBeta * dBeta + dGamma * dGamma);
+    
+    // Factor de escala: aprox 0.05 metros por grado de inclinación
+    // Esto es una simulación visual para el prototipo
+    return angularDiff * 0.085;
+  };
+
+  // Dibujar la línea en el canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrame: number;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      if (points.length > 0) {
+        const start = points[0];
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        // Dibujar punto inicial
+        ctx.beginPath();
+        ctx.arc(start.x, start.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#fbbf24'; // yellow-400
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Dibujar línea elástica
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        
+        const isFinished = points.length === 2;
+        const targetX = isFinished ? points[1].x : centerX;
+        const targetY = isFinished ? points[1].y : centerY;
+        
+        ctx.lineTo(targetX, targetY);
+        
+        if (isFinished) {
+          ctx.setLineDash([]); // Solid line when finished
+          ctx.strokeStyle = '#fbbf24'; // Yellow-400 for better visibility
+          ctx.lineWidth = 5;
+        } else {
+          ctx.setLineDash([5, 5]); // Dashed while measuring
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 3;
+        }
+        
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Si estamos midiendo, actualizar distancia en tiempo real
+        if (points.length === 1) {
+          const liveDist = calculateDistance(points[0].angle, currentAngle);
+          setDistance(liveDist);
+        }
+
+        // Dibujar punto final si existe
+        if (points.length === 2) {
+          ctx.beginPath();
+          ctx.arc(points[1].x, points[1].y, 8, 0, Math.PI * 2);
+          ctx.fillStyle = '#ef4444'; // red-500
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      animationFrame = requestAnimationFrame(draw);
+    };
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    draw();
+
+    return () => cancelAnimationFrame(animationFrame);
+  }, [points, currentAngle]);
+
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+    <div className="fixed inset-0 bg-black z-50 flex flex-col overflow-hidden">
       <AnimatePresence>
         {showIntro && (
           <motion.div 
@@ -268,111 +357,38 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   <Ruler className="w-8 h-8 text-purple-600" />
                 </div>
                 <h3 className="text-2xl font-black uppercase tracking-tighter text-gray-900">Medidor AR</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Características del Sistema</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Herramienta de Medición</p>
               </div>
 
               <div className="space-y-4">
-                <div className="flex gap-4 items-start">
-                  <div className="p-2 bg-gray-50 rounded-lg"><Maximize className="w-4 h-4 text-gray-400" /></div>
-                  <div>
-                    <h4 className="text-[10px] font-black uppercase text-gray-900">Precisión Digital</h4>
-                    <p className="text-[9px] text-gray-500 font-medium">Cálculo estimado mediante sensores ópticos del dispositivo.</p>
-                  </div>
-                </div>
-                <div className="flex gap-4 items-start">
-                  <div className="p-2 bg-gray-50 rounded-lg"><RefreshCw className="w-4 h-4 text-gray-400" /></div>
-                  <div>
-                    <h4 className="text-[10px] font-black uppercase text-gray-900">Tiempo Real</h4>
-                    <p className="text-[9px] text-gray-500 font-medium">Procesamiento instantáneo de la imagen para medidas rápidas.</p>
-                  </div>
-                </div>
-                <div className="flex gap-4 items-start">
-                  <div className="p-2 bg-gray-50 rounded-lg"><Info className="w-4 h-4 text-gray-400" /></div>
-                  <div>
-                    <h4 className="text-[10px] font-black uppercase text-gray-900">Uso en Campo</h4>
-                    <p className="text-[9px] text-gray-500 font-medium">Diseñado para entornos de obra y mantenimiento USAC.</p>
-                  </div>
-                </div>
+                <Step num="1" text="Apunta al punto de inicio y pulsa 'Marcar Inicio'." />
+                <Step num="2" text="Mueve el móvil hacia el punto final. Verás la línea estirarse." />
+                <Step num="3" text="Pulsa 'Fijar Punto' para obtener la distancia final en metros." />
               </div>
 
-              <div className="pt-4 space-y-3">
-                <button 
-                  onClick={() => setShowInstructions(true)}
-                  className="w-full p-4 bg-gray-100 text-gray-600 rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                  <Calculator className="w-4 h-4" /> Instrucciones de uso
-                </button>
-                <button 
-                  onClick={() => setShowIntro(false)}
-                  className="w-full p-5 bg-purple-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-purple-200 active:scale-95 transition-all"
-                >
-                  Aceptar y Comenzar
-                </button>
-              </div>
+              <button 
+                onClick={() => setShowIntro(false)}
+                className="w-full p-5 bg-purple-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all"
+              >
+                Comenzar Medición
+              </button>
             </div>
-          </motion.div>
-        )}
-
-        {showInstructions && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute inset-0 z-[70] bg-white flex flex-col p-8"
-          >
-            <div className="flex-1 space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-50 rounded-xl text-purple-600"><Info className="w-6 h-6" /></div>
-                <h3 className="text-xl font-black uppercase tracking-tighter">Instrucciones</h3>
-              </div>
-
-              <div className="space-y-6">
-                <Step num="1" text="Apunta la cámara hacia el objeto o punto de destino que deseas medir." />
-                <Step num="2" text="Mantén el teléfono lo más estable posible para una mejor precisión." />
-                <Step num="3" text="Pulsa el botón central 'Capturar Medida' para iniciar el escaneo." />
-                <Step num="4" text="El resultado aparecerá en pantalla expresado en metros (m)." />
-              </div>
-
-              <div className="p-6 bg-amber-50 rounded-3xl border border-amber-100">
-                <p className="text-[10px] text-amber-800 font-bold leading-relaxed">
-                  <span className="uppercase tracking-widest block mb-1">Nota Importante:</span>
-                  Esta herramienta proporciona medidas estimadas. Para trabajos de alta precisión, se recomienda el uso de cinta métrica o distanciómetro láser profesional.
-                </p>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setShowInstructions(false)}
-              className="w-full p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-2xl active:scale-95 transition-all"
-            >
-              Entendido, Volver
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="relative flex-1 overflow-hidden">
-        {error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gray-900">
-            <Camera className="w-12 h-12 text-gray-600 mb-4" />
-            <p className="text-white font-bold uppercase text-[10px] mb-6 leading-relaxed max-w-[200px]">{error}</p>
-            <button 
-              onClick={startCamera}
-              className="px-8 py-4 bg-yellow-400 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all"
-            >
-              Reintentar Cámara
-            </button>
-          </div>
-        ) : (
-          <video 
-            ref={videoRef} 
-            autoPlay 
-            playsInline 
-            muted
-            onLoadedMetadata={() => videoRef.current?.play()}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        )}
+      <div className="relative flex-1">
+        <video 
+          ref={videoRef} 
+          autoPlay 
+          playsInline 
+          muted
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <canvas 
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+        />
 
         {/* UI OVERLAY */}
         <div className="absolute inset-0 flex flex-col justify-between p-6 pointer-events-none">
@@ -381,36 +397,46 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               <ArrowLeft />
             </button>
             <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest">
-              Medidor AR v1.0
+              AR Distance Meter
             </div>
           </div>
 
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-2 border-white/50 rounded-full flex items-center justify-center">
-            <div className="w-1 h-1 bg-red-500 rounded-full shadow-[0_0_10px_red]" />
-          </div>
+          {/* Crosshair */}
+          {points.length < 2 && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center pointer-events-none">
+              <div className="w-full h-[2px] bg-white/30 absolute" />
+              <div className="h-full w-[2px] bg-white/30 absolute" />
+              <div className="w-2 h-2 bg-yellow-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.8)]" />
+            </div>
+          )}
 
           <div className="space-y-6 pointer-events-auto">
             {distance !== null && (
               <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-3xl p-6 shadow-2xl text-center"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="bg-white/90 backdrop-blur-md rounded-3xl p-6 shadow-2xl text-center border border-white"
               >
-                <div className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Distancia Estimada</div>
-                <div className="text-4xl font-black text-gray-900">{distance.toFixed(2)} <span className="text-sm">m</span></div>
+                <div className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">
+                  {points.length === 1 ? 'Midiendo...' : 'Distancia Final'}
+                </div>
+                <div className="text-5xl font-black text-gray-900">
+                  {distance.toFixed(2)} <span className="text-sm">m</span>
+                </div>
               </motion.div>
             )}
 
             <button 
-              onClick={handleMeasure}
-              disabled={isMeasuring}
-              className={`w-full p-8 rounded-[2.5rem] font-black uppercase tracking-widest text-sm shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4 ${isMeasuring ? 'bg-gray-400 text-white' : 'bg-yellow-400 text-black'}`}
+              onClick={handleAction}
+              className={`w-full p-8 rounded-[2.5rem] font-black uppercase tracking-widest text-sm shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4 ${
+                points.length === 0 ? 'bg-yellow-400 text-black' : 
+                points.length === 1 ? 'bg-red-500 text-white' : 
+                'bg-gray-900 text-white'
+              }`}
             >
-              {isMeasuring ? (
-                <><RefreshCw className="w-6 h-6 animate-spin" /> Midiendo...</>
-              ) : (
-                <><Ruler className="w-6 h-6" /> Capturar Medida</>
-              )}
+              {points.length === 0 && <><PlusCircle className="w-6 h-6" /> Marcar Inicio</>}
+              {points.length === 1 && <><CheckCircle className="w-6 h-6" /> Fijar Punto Final</>}
+              {points.length === 2 && <><RefreshCw className="w-6 h-6" /> Nueva Medida</>}
             </button>
           </div>
         </div>

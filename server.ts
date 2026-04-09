@@ -22,13 +22,19 @@ if (fs.existsSync(firebaseConfigPath)) {
 import { WATER_HISTORY } from './src/services/waterHistoryData.js';
 
 // Initialize Firebase Admin
+let adminApp: admin.app.App;
 if (admin.apps.length === 0) {
-  admin.initializeApp({
+  console.log(`Initializing Firebase Admin for project: ${firebaseConfig.projectId}`);
+  adminApp = admin.initializeApp({
     projectId: firebaseConfig.projectId
   });
+} else {
+  adminApp = admin.app();
 }
 
-const db = getFirestore(firebaseConfig.firestoreDatabaseId || '(default)');
+const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+console.log(`Connecting to Firestore database: ${dbId}`);
+const db = getFirestore(adminApp, dbId);
 
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
@@ -477,7 +483,7 @@ async function startServer() {
   if (isProduction && distExists) {
     console.log("Serving production build from dist/");
     app.use(express.static("dist"));
-    app.get("*", (req, res) => {
+    app.get("*all", (req, res) => {
       res.sendFile(path.join(process.cwd(), "dist", "index.html"));
     });
   } else {
@@ -491,7 +497,7 @@ async function startServer() {
       app.use(vite.middlewares);
     } catch (e) {
       console.error("Failed to start Vite middleware. If this is production, ensure 'npm run build' was executed.", e);
-      app.get("*", (req, res) => {
+      app.get("*all", (req, res) => {
         res.status(500).send("Server configuration error: dist/ not found and Vite not available.");
       });
     }
