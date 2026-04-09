@@ -78,7 +78,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
     e.preventDefault();
     setError('');
     
-    if (!formData.name || !formData.username || !formData.password) {
+    if (!formData.username || !formData.password) {
       setError('Todos los campos son obligatorios');
       return;
     }
@@ -92,7 +92,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
 
       const newUser: User = {
         id: firebaseUser.uid,
-        name: formData.name,
+        name: formData.name || formData.username, // Use username as fallback name
         username: formData.username,
         password: '', // Don't store plain password in Firestore
         role: formData.username.toLowerCase() === 'admin' ? 'MASTER' : formData.role,
@@ -132,6 +132,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
           <p className="text-center text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mb-8">Completa tu perfil técnico</p>
           
           <div className="space-y-4">
+            <div className="relative">
+              <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Nombre y Apellidos" 
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100"
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
+              />
+            </div>
+
             <div className="relative">
               <ShieldCheck className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
@@ -178,6 +189,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
                 try {
                   const userRef = doc(db, 'users', auth.currentUser!.uid);
                   await setDoc(userRef, {
+                    name: formData.name,
                     phone: formData.phone,
                     role: formData.role,
                     specialty: formData.specialty,
@@ -246,32 +258,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
           <form onSubmit={view === 'login' ? handleLogin : handleRegister} className="space-y-4">
             {error && <div className="p-4 bg-red-50 text-red-600 text-[10px] font-black rounded-2xl border border-red-100 uppercase">{error}</div>}
             
-            {view === 'register' && (
-              <div className="relative">
-                <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input 
-                  type="text" 
-                  placeholder="Nombre y Apellidos" 
-                  disabled={loading}
-                  className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100 text-gray-900 disabled:opacity-50 transition-all"
-                  value={formData.name}
-                  onChange={e => setFormData({...formData, name: e.target.value})}
-                />
-              </div>
-            )}
-
-            <div className="relative">
-              <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input 
-                type="email" 
-                placeholder="Correo Electrónico" 
-                disabled={loading}
-                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100 text-gray-900 disabled:opacity-50 transition-all"
-                value={formData.email}
-                onChange={e => setFormData({...formData, email: e.target.value})}
-              />
-            </div>
-
             <div className="relative">
               <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
@@ -334,9 +320,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
           {view === 'login' ? (
             <button 
               onClick={() => setView('register')} 
-              className="w-full p-4 bg-white border-2 border-gray-900 text-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="w-full p-4 bg-white border-2 border-gray-900 text-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all flex flex-col items-center justify-center gap-1 active:scale-95"
             >
-              <UserPlus className="w-4 h-4" /> Solicitar Registro en {initialRole}
+              <span className="text-gray-400 font-bold text-[8px]">¿No tienes cuenta?</span>
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4" /> Registrarse en SIGAI
+              </div>
             </button>
           ) : (
             <button onClick={() => setView('login')} className="text-[10px] font-black uppercase text-gray-400 hover:text-tactical-orange transition-colors">

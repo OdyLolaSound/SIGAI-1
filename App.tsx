@@ -421,7 +421,7 @@ const App: React.FC = () => {
             <button 
               onClick={() => { 
                 setAuthRole('USAC'); 
-                setAuthInitialView('register');
+                setAuthInitialView('login');
                 setShowAuthModal(true); 
               }}
               className="w-full p-6 bg-white border-2 border-gray-900 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[11px] shadow-lg flex items-center justify-center gap-4 active:scale-95 transition-all"
@@ -637,7 +637,7 @@ const App: React.FC = () => {
             <button 
               onClick={() => { 
                 setAuthRole('USAC'); 
-                setAuthInitialView('register');
+                setAuthInitialView('login');
                 setShowAuthModal(true); 
               }}
               className="w-full p-6 bg-white border-2 border-gray-900 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[11px] shadow-lg flex items-center justify-center gap-4 active:scale-95 transition-all"
