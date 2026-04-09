@@ -46,6 +46,9 @@ const App: React.FC = () => {
   const [unitMenuOpen, setUnitMenuOpen] = useState(() => {
     return localStorage.getItem('sigai_unit_menu_open') === 'true';
   });
+  const [activeUnit, setActiveUnit] = useState<Role | null>(() => {
+    return (localStorage.getItem('sigai_active_unit') as Role) || null;
+  });
   const [isSyncing, setIsSyncing] = useState(true);
 
   useEffect(() => {
@@ -166,6 +169,11 @@ const App: React.FC = () => {
     localStorage.setItem('sigai_unit_menu_open', unitMenuOpen.toString());
   }, [unitMenuOpen]);
 
+  useEffect(() => {
+    if (activeUnit) localStorage.setItem('sigai_active_unit', activeUnit);
+    else localStorage.removeItem('sigai_active_unit');
+  }, [activeUnit]);
+
   const isMaster = currentUser?.role === 'MASTER';
   const isAuthorized = currentUser?.role === 'USAC' || isMaster;
   
@@ -173,7 +181,8 @@ const App: React.FC = () => {
   const hideHeader = false;
 
   const handleUnitClick = (role: Role) => {
-    if (currentUser && (isMaster || currentUser.role === role)) {
+    if (currentUser && (isMaster || currentUser.assignedUnits?.includes(role))) {
+      setActiveUnit(role);
       setUnitMenuOpen(true);
       return;
     }
@@ -184,7 +193,7 @@ const App: React.FC = () => {
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
     setShowAuthModal(false);
-    setUnitMenuOpen(true);
+    setUnitMenuOpen(false);
     setSelectedService(null);
   };
 
@@ -262,6 +271,7 @@ const App: React.FC = () => {
     setUnitMenuOpen(false);
     setSelectedService(null);
     setSelectedBuilding(null);
+    setActiveUnit(null);
   };
 
   const handleLogout = async () => {
@@ -272,10 +282,12 @@ const App: React.FC = () => {
     setSelectedService(null);
     setSelectedBuilding(null);
     setUnitMenuOpen(false);
+    setActiveUnit(null);
     localStorage.removeItem('sigai_active_tab');
     localStorage.removeItem('sigai_selected_building');
     localStorage.removeItem('sigai_selected_service');
     localStorage.removeItem('sigai_unit_menu_open');
+    localStorage.removeItem('sigai_active_unit');
   };
 
   const handleBack = () => {
@@ -297,7 +309,10 @@ const App: React.FC = () => {
     }
     if (selectedBuilding) { setSelectedBuilding(null); }
     else if (selectedService) { setSelectedService(null); setUnitMenuOpen(true); }
-    else if (unitMenuOpen) { setUnitMenuOpen(false); }
+    else if (unitMenuOpen) { 
+      setUnitMenuOpen(false); 
+      setActiveUnit(null);
+    }
   };
 
   if (isSyncing) {
@@ -318,7 +333,7 @@ const App: React.FC = () => {
     }
 
     if (activeTab === AppTab.CALENDAR && currentUser) {
-      return <CalendarView user={currentUser} onNavigate={setActiveTab} />;
+      return <CalendarView user={currentUser} activeUnit={activeUnit || currentUser.role} onNavigate={setActiveTab} />;
     }
 
     if (activeTab === AppTab.BOILERS && currentUser) {
@@ -350,7 +365,7 @@ const App: React.FC = () => {
     }
 
     if (activeTab === AppTab.TEAM && currentUser) {
-      return <TeamPanel currentUser={currentUser} />;
+      return <TeamPanel currentUser={currentUser} activeUnit={activeUnit || currentUser.role} />;
     }
 
     if (activeTab === AppTab.AI_REQUEST && currentUser) {
@@ -422,6 +437,7 @@ const App: React.FC = () => {
       return (
         <UnitDashboard 
           user={currentUser}
+          activeUnit={activeUnit || currentUser.role}
           onNavigate={setActiveTab}
           onServiceClick={handleServiceClick}
           onRequestClick={handleRequestClick}

@@ -14,18 +14,19 @@ import { getLocalDateString } from '../services/dateUtils';
 
 interface UnitDashboardProps {
   user: User;
+  activeUnit: Role;
   onNavigate: (tab: AppTab) => void;
   onServiceClick: (service: ServiceType) => void;
   onRequestClick: (type: 'peticion' | 'material') => void;
 }
 
-const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServiceClick, onRequestClick }) => {
+const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavigate, onServiceClick, onRequestClick }) => {
   const isMaster = user.role === 'MASTER';
   
   // DATA CALCULATIONS
-  const tasks = useMemo(() => storageService.getTasks(), []);
-  const requests = useMemo(() => storageService.getRequests(), []);
-  const team = useMemo(() => storageService.getUsers(), []);
+  const tasks = useMemo(() => storageService.getTasks().filter(t => isMaster || t.type === activeUnit), [activeUnit, isMaster]);
+  const requests = useMemo(() => storageService.getRequests().filter(r => isMaster || r.unit === activeUnit), [activeUnit, isMaster]);
+  const team = useMemo(() => storageService.getUsers().filter(u => isMaster || u.assignedUnits?.includes(activeUnit)), [activeUnit, isMaster]);
   const waterReadings = useMemo(() => storageService.getReadings('BASE_ALICANTE', 'agua'), []);
   const notifications = useMemo(() => storageService.getNotifications().filter(n => !n.read).sort((a, b) => b.date.localeCompare(a.date)), []);
   
@@ -75,7 +76,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
     return Math.round((closed / total) * 100);
   }, [requests]);
 
-  const isRestricted = !isMaster && user.role !== 'USAC';
+  const isRestricted = !isMaster && activeUnit !== 'USAC';
   
   return (
     <div className="w-full max-w-sm mx-auto space-y-10 pb-12 animate-in fade-in duration-500">
@@ -120,7 +121,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, onNavigate, onServi
              </div>
           </div>
           <h2 className="text-3xl font-black uppercase tracking-tighter leading-none mb-2">
-            {isMaster ? 'MÓDULO MAESTRO' : `UNIDAD ${user.role}`}
+            {isMaster ? `MÓDULO MAESTRO (${activeUnit})` : `UNIDAD ${activeUnit}`}
           </h2>
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">
             {isRestricted ? 'Solicitud de Apoyo Técnico' : 'Sistema Integrado de Apoyo'}

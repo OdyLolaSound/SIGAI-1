@@ -1,17 +1,18 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, User, CheckCircle2, AlertCircle, AlertTriangle, Send, Trash2, X, Building, Users } from 'lucide-react';
-import { CalendarTask, User as UserType, UrgencyLevel, AppTab, ExternalUser } from '../types';
+import { CalendarTask, User as UserType, UrgencyLevel, AppTab, ExternalUser, Role } from '../types';
 import { storageService } from '../services/storageService';
 import { getLocalDateString, isHoliday } from '../services/dateUtils';
 import TaskForm from './TaskForm';
 
 interface CalendarViewProps {
   user: UserType;
+  activeUnit: Role;
   onNavigate: (tab: AppTab) => void;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigate }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tasks, setTasks] = useState<CalendarTask[]>([]);
@@ -19,9 +20,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, onNavigate }) => {
   const [editingTask, setEditingTask] = useState<CalendarTask | undefined>(undefined);
   const [taskToDelete, setTaskToDelete] = useState<CalendarTask | null>(null);
 
+  const isMaster = user.role === 'MASTER';
+
   useEffect(() => {
-    setTasks(storageService.getTasks());
-  }, [showForm]);
+    const allTasks = storageService.getTasks();
+    const filteredTasks = allTasks.filter(t => isMaster || t.type === activeUnit);
+    setTasks(filteredTasks);
+  }, [showForm, activeUnit, isMaster]);
 
   const daysInMonth = useMemo(() => {
     const year = currentDate.getFullYear();

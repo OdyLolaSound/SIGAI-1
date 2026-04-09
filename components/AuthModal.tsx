@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShieldCheck, User as UserIcon, Lock, ChevronLeft, ChevronRight, UserPlus, AlertCircle, Crown } from 'lucide-react';
+import { ShieldCheck, User as UserIcon, Lock, ChevronLeft, ChevronRight, UserPlus, AlertCircle, Crown, Phone } from 'lucide-react';
 import { Role, User } from '../types';
 import { storageService } from '../services/storageService';
 
@@ -15,13 +15,15 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) => {
-  const [view, setView] = useState<'login' | 'register' | 'pending'>('login');
+  const [view, setView] = useState<'login' | 'register' | 'pending' | 'complementary'>('login');
   const [formData, setFormData] = useState({
     name: '',
     username: '',
+    email: '',
     password: '',
     phone: '',
     role: initialRole,
+    specialty: '',
     isManto: false
   });
   const [error, setError] = useState('');
@@ -133,8 +135,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
       return;
     }
 
+    setLoading(true);
     try {
-      const email = `${formData.username.toLowerCase()}@sigai.local`;
+      // Use the provided email or generate one if not provided
+      const email = formData.username.includes('@') ? formData.username : `${formData.username.toLowerCase()}@sigai.local`;
       const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
       const firebaseUser = userCredential.user;
 
@@ -146,7 +150,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
         role: formData.username.toLowerCase() === 'admin' ? 'MASTER' : formData.role,
         status: formData.username.toLowerCase() === 'admin' ? 'approved' : 'pending',
         assignedBuildings: [],
-        assignedUnits: formData.username.toLowerCase() === 'admin' ? ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] : [],
+        assignedUnits: formData.username.toLowerCase() === 'admin' ? ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] : [formData.role],
         phone: formData.phone,
         isManto: formData.username.toLowerCase() === 'admin' ? true : formData.isManto,
         leaveDays: []
@@ -154,22 +158,99 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
 
       await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
       
-      if (newUser.status === 'approved') {
-        onLogin(newUser);
-      } else {
-        setView('pending');
-      }
+      // After initial registration, move to complementary data view
+      setView('complementary');
     } catch (err: any) {
       console.error("Registration error:", err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('El nombre de usuario ya está registrado');
+        setError('El nombre de usuario o email ya está registrado');
       } else if (err.code === 'auth/operation-not-allowed') {
-        setError('El registro con Email/Contraseña no está habilitado en la consola de Firebase.');
+        setError('El registro con Email/Contraseña no está habilitado. Por favor, contacte con el administrador para habilitarlo en la consola de Firebase.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('La contraseña debe tener al menos 6 caracteres');
       } else {
-        setError('Error al registrar el usuario');
+        setError(`Error al registrar: ${err.message}`);
       }
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (view === 'complementary') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col relative border border-gray-100 p-10">
+          <h2 className="text-2xl font-black text-center uppercase tracking-tighter mb-2 text-gray-900">Datos Complementarios</h2>
+          <p className="text-center text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mb-8">Completa tu perfil técnico</p>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <ShieldCheck className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Cargo / Empleo (ej. Cabo 1º, Soldado...)" 
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100"
+                value={formData.specialty}
+                onChange={e => setFormData({...formData, specialty: e.target.value})}
+              />
+            </div>
+
+            <div className="relative">
+              <Phone className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="tel" 
+                placeholder="Número de Teléfono" 
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100"
+                value={formData.phone}
+                onChange={e => setFormData({...formData, phone: e.target.value})}
+              />
+            </div>
+            
+            <div className="relative">
+              <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <select 
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100 appearance-none"
+                value={formData.role}
+                onChange={e => setFormData({...formData, role: e.target.value as Role})}
+              >
+                <option value="USAC">Unidad: USAC</option>
+                <option value="CG">Unidad: CG</option>
+                <option value="GCG">Unidad: GCG</option>
+                <option value="GOE3">Unidad: GOE III</option>
+                <option value="GOE4">Unidad: GOE IV</option>
+                <option value="BOEL">Unidad: BOEL XIX</option>
+                <option value="UMOE">Unidad: UMOE</option>
+                <option value="CECOM">Unidad: CECOM</option>
+              </select>
+            </div>
+
+            <button 
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const userRef = doc(db, 'users', auth.currentUser!.uid);
+                  await setDoc(userRef, {
+                    phone: formData.phone,
+                    role: formData.role,
+                    specialty: formData.specialty,
+                    assignedUnits: [formData.role]
+                  }, { merge: true });
+                  setView('pending');
+                } catch (e) {
+                  setError('Error al guardar datos complementarios');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="w-full p-6 bg-tactical-orange text-black rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 mt-4"
+            >
+              Finalizar Registro <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (view === 'pending') {
     return (
@@ -251,6 +332,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
                 />
               </div>
             )}
+
+            <div className="relative">
+              <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="email" 
+                placeholder="Correo Electrónico" 
+                disabled={loading}
+                className="w-full p-5 pl-14 bg-gray-50 rounded-2xl outline-none focus:ring-2 ring-tactical-orange/20 text-[11px] font-bold border border-gray-100 text-gray-900 disabled:opacity-50 transition-all"
+                value={formData.email}
+                onChange={e => setFormData({...formData, email: e.target.value})}
+              />
+            </div>
 
             <div className="relative">
               <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

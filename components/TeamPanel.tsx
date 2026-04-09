@@ -1,15 +1,16 @@
 
 import React, { useMemo, useState } from 'react';
 import { Users, Calendar, CheckCircle, XCircle, ChevronRight, Phone, Mail, Award, Settings2, X, ChevronLeft, Plus, ShieldCheck, Briefcase, FileText, Edit2 } from 'lucide-react';
-import { User, LeaveEntry, LeaveType } from '../types';
+import { User, LeaveEntry, LeaveType, Role } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
 
 interface TeamPanelProps {
   currentUser: User;
+  activeUnit: Role;
 }
 
-const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
+const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser, activeUnit }) => {
   const [allUsers, setAllUsers] = useState<User[]>(() => storageService.getUsers());
   const [managingTech, setManagingTech] = useState<User | null>(null);
   const [editingTech, setEditingTech] = useState<User | null>(null);
@@ -18,9 +19,11 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const today = getLocalDateString();
 
+  const isMaster = currentUser.role === 'MASTER';
+
   const mantoTechs = useMemo(() => {
-    return allUsers.filter(u => u.isManto && u.status === 'approved');
-  }, [allUsers]);
+    return allUsers.filter(u => u.isManto && u.status === 'approved' && (isMaster || u.assignedUnits?.includes(activeUnit)));
+  }, [allUsers, activeUnit, isMaster]);
 
   const isAvailable = (user: User) => {
     return !user.leaveDays || !user.leaveDays.includes(today);
@@ -238,6 +241,7 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
 
       {showCreateModal && (
         <CreateTechModal 
+          activeUnit={activeUnit}
           onClose={() => setShowCreateModal(false)}
           onCreated={() => {
             setAllUsers(storageService.getUsers());
@@ -273,11 +277,12 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser }) => {
 };
 
 interface CreateTechModalProps {
+  activeUnit: Role;
   onClose: () => void;
   onCreated: () => void;
 }
 
-const CreateTechModal: React.FC<CreateTechModalProps> = ({ onClose, onCreated }) => {
+const CreateTechModal: React.FC<CreateTechModalProps> = ({ activeUnit, onClose, onCreated }) => {
   const [name, setName] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [phone, setPhone] = useState('');
@@ -292,10 +297,10 @@ const CreateTechModal: React.FC<CreateTechModalProps> = ({ onClose, onCreated })
       name,
       username,
       password,
-      role: 'USAC',
+      role: activeUnit,
       status: 'approved',
-      assignedBuildings: BUILDINGS.map(b => b.id),
-      assignedUnits: ['USAC'],
+      assignedBuildings: activeUnit === 'USAC' ? BUILDINGS.map(b => b.id) : [],
+      assignedUnits: [activeUnit],
       isManto: true,
       specialty,
       phone,

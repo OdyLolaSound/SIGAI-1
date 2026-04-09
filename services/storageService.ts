@@ -279,6 +279,13 @@ export const storageService = {
       handleFirestoreError(e, OperationType.UPDATE, 'users');
     }
   },
+  deleteUser: async (userId: string) => {
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'users');
+    }
+  },
   addLeaveEntry: async (userId: string, entry: LeaveEntry) => {
     try {
       const user = cache.users.find((u: any) => u.id === userId);

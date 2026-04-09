@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
-import { UserCheck, ShieldCheck, Building2, UserX, Check, Lock, RefreshCcw, Crown, CheckCircle2, Phone, Mail, Edit2, Save, XCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserCheck, ShieldCheck, Building2, UserX, Check, Lock, RefreshCcw, Crown, CheckCircle2, Phone, Mail, Edit2, Save, XCircle, Trash2, Circle } from 'lucide-react';
 import { User, Building, Role } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
+import { db } from '../firebase';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 
 interface AdminPanelProps {
   currentUser: User;
@@ -10,12 +12,38 @@ interface AdminPanelProps {
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
   const [users, setUsers] = useState<User[]>(storageService.getUsers());
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingDetailsId, setEditingDetailsId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: '', phone: '', username: '' });
   const [tempBuildings, setTempBuildings] = useState<string[]>([]);
   const [tempUnits, setTempUnits] = useState<Role[]>([]);
   const isMaster = currentUser.role === 'MASTER';
+
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Escuchar cambios en tiempo real de los usuarios
+    const q = query(collection(db, 'users'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
+      setUsers(usersData);
+    });
+
+    // Simulación de estados online (en un sistema real usaríamos Firebase Presence)
+    const interval = setInterval(() => {
+      // Simulamos que algunos usuarios están conectados
+      const randomOnline = users
+        .filter(() => Math.random() > 0.7)
+        .map(u => u.id);
+      setOnlineUsers(prev => [...new Set([...randomOnline, currentUser.id])]);
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [currentUser.id]);
 
   const handleApprove = (userId: string) => {
     setEditingUserId(userId);
@@ -35,6 +63,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     if (newPass) {
       storageService.resetUserPassword(userId, newPass);
       alert('Contraseña actualizada con éxito');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (confirm('¿ESTÁ SEGURO? Esta acción eliminará permanentemente al usuario y no podrá acceder al sistema.')) {
+      setIsDeleting(userId);
+      try {
+        await storageService.deleteUser(userId);
+        setUsers(prev => prev.filter(u => u.id !== userId));
+      } catch (error) {
+        alert('Error al eliminar usuario');
+      } finally {
+        setIsDeleting(null);
+      }
     }
   };
 
@@ -85,9 +127,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
   };
 
   const toggleUnit = (role: Role) => {
-    setTempUnits(prev => 
-      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
-    );
+    setTempUnits(prev => {
+      const isRemovingUSAC = role === 'USAC' && prev.includes('USAC');
+      if (isRemovingUSAC) {
+        setTempBuildings([]); // Clear buildings if USAC is removed
+      }
+      return prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role];
+    });
   };
 
   const ROLES_LIST: Role[] = ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'];
@@ -115,11 +161,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
           filteredUsers.map(user => (
             <div key={user.id} className={`bg-white border rounded-[2.5rem] p-6 shadow-sm transition-all ${user.status === 'pending' ? 'border-tactical-orange/30' : 'border-gray-100'}`}>
               <div className="flex items-center justify-between mb-4 gap-4">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className={`p-3 rounded-2xl ${user.status === 'pending' ? 'bg-tactical-orange/10 text-tactical-orange' : 'bg-gray-50 text-gray-400'}`}>
-                    {user.role === 'MASTER' ? <Crown className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
-                  </div>
-                  <div className="text-left">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="relative">
+                      <div className={`p-3 rounded-2xl ${user.status === 'pending' ? 'bg-tactical-orange/10 text-tactical-orange' : 'bg-gray-50 text-gray-400'}`}>
+                        {user.role === 'MASTER' ? <Crown className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
+                      </div>
+                      {onlineUsers.includes(user.id) && (
+                        <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-tactical-emerald border-2 border-white rounded-full animate-pulse" title="En línea" />
+                      )}
+                    </div>
+                    <div className="text-left">
                     {editingDetailsId === user.id ? (
                       <div className="space-y-2 mt-2">
                         <input 
@@ -206,51 +257,77 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                 </div>
               </div>
 
-              {editingUserId === user.id ? (
-                <div className="space-y-6 border-t border-gray-50 pt-6 animate-in slide-in-from-top-4">
-                  
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Unidades Autorizadas (Botones):</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {ROLES_LIST.map(role => (
-                        <button key={role} onClick={() => toggleUnit(role)} className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${tempUnits.includes(role) ? 'border-tactical-orange/50 bg-tactical-orange/10 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-300'}`}>
-                          <CheckCircle2 className={`w-3 h-3 ${tempUnits.includes(role) ? 'text-tactical-orange opacity-100' : 'opacity-20'}`} />
-                          <span className="text-[10px] font-black uppercase">{role}</span>
+                  {editingUserId === user.id ? (
+                    <div className="space-y-6 border-t border-gray-50 pt-6 animate-in slide-in-from-top-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase text-tactical-orange tracking-widest">Configuración de Acceso</p>
+                        <button onClick={() => setEditingUserId(null)} className="p-2 text-gray-400 hover:text-gray-600">
+                          <XCircle className="w-5 h-5" />
                         </button>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                      
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Unidades Autorizadas (Botones):</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {ROLES_LIST.map(role => (
+                            <button key={role} onClick={() => toggleUnit(role)} className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${tempUnits.includes(role) ? 'border-tactical-orange/50 bg-tactical-orange/10 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-300'}`}>
+                              <CheckCircle2 className={`w-3 h-3 ${tempUnits.includes(role) ? 'text-tactical-orange opacity-100' : 'opacity-20'}`} />
+                              <span className="text-[10px] font-black uppercase">{role}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Edificios Autorizados (Lecturas):</p>
-                    <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
-                      {BUILDINGS.map(b => (
-                        <button key={b.id} onClick={() => toggleBuilding(b.id)} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${tempBuildings.includes(b.id) ? 'border-tactical-orange/50 bg-tactical-orange/10 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-300'}`}>
-                          <div className="flex items-center gap-3">
-                             <Building2 className="w-4 h-4" />
-                             <span className="text-[10px] font-bold uppercase">{b.name} ({b.code})</span>
+                      {tempUnits.includes('USAC') && (
+                        <div className="animate-in slide-in-from-top-2 duration-300">
+                          <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3 flex items-center gap-2">
+                            <Building2 className="w-3 h-3 text-tactical-orange" /> Edificios Autorizados para Lecturas (Solo USAC):
+                          </p>
+                          <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-hide bg-gray-50/50 p-3 rounded-2xl border border-gray-100">
+                            {BUILDINGS.filter(b => b.hasBoiler || b.id.startsWith('CT_')).map(b => (
+                              <button key={b.id} onClick={() => toggleBuilding(b.id)} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${tempBuildings.includes(b.id) ? 'border-tactical-orange/50 bg-tactical-orange/10 text-gray-900' : 'border-white bg-white text-gray-400'}`}>
+                                <div className="flex items-center gap-3">
+                                   <div className={`p-1.5 rounded-lg ${tempBuildings.includes(b.id) ? 'bg-tactical-orange text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                      <Building2 className="w-3.5 h-3.5" />
+                                   </div>
+                                   <div className="text-left">
+                                      <div className="text-[10px] font-black uppercase leading-none">{b.name}</div>
+                                      <div className="text-[8px] font-bold opacity-50 mt-1">{b.code}</div>
+                                   </div>
+                                </div>
+                                {tempBuildings.includes(b.id) && <Check className="w-4 h-4 text-tactical-orange" />}
+                              </button>
+                            ))}
                           </div>
-                          {tempBuildings.includes(b.id) && <Check className="w-4 h-4 text-tactical-orange" />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                          <p className="text-[8px] text-gray-400 font-bold uppercase mt-2 px-2 italic">
+                            * Solo se muestran edificios con calderas o centros de transformación.
+                          </p>
+                        </div>
+                      )}
 
-                  <button onClick={() => saveApproval(user.id)} className="w-full p-5 bg-tactical-orange text-black rounded-[2rem] font-black uppercase text-xs tracking-widest mt-2 shadow-xl active:scale-95 transition-all shadow-tactical-orange/20">
-                    Guardar Configuración de Acceso
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <button onClick={() => handleApprove(user.id)} className="flex-[2] p-3 bg-gray-50 text-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-100">Gestionar</button>
-                  {isMaster && (
-                    <button onClick={() => handleResetPass(user.id)} title="Reset Password" className="p-3 bg-tactical-orange/10 text-tactical-orange rounded-2xl active:scale-90 transition-all border border-tactical-orange/20">
-                      <Lock className="w-5 h-5" />
-                    </button>
+                      <button onClick={() => saveApproval(user.id)} className="w-full p-5 bg-tactical-orange text-black rounded-[2rem] font-black uppercase text-xs tracking-widest mt-2 shadow-xl active:scale-95 transition-all shadow-tactical-orange/20">
+                        {user.status === 'pending' ? 'Aprobar y Guardar Acceso' : 'Actualizar Configuración'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => handleApprove(user.id)} className="flex-[2] p-3 bg-gray-50 text-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-100">Gestionar</button>
+                      {isMaster && (
+                        <>
+                          <button onClick={() => handleResetPass(user.id)} title="Reset Password" className="p-3 bg-tactical-orange/10 text-tactical-orange rounded-2xl active:scale-90 transition-all border border-tactical-orange/20">
+                            <Lock className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteUser(user.id)} 
+                            disabled={isDeleting === user.id}
+                            className="p-3 bg-red-50 text-red-600 rounded-2xl active:scale-90 transition-all border border-red-100 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
-                  <button onClick={() => handleReject(user.id)} className="p-3 bg-red-50 text-red-600 rounded-2xl active:scale-90 transition-all border border-red-100"><UserX className="w-5 h-5" /></button>
-                </div>
-              )}
             </div>
           ))
         )}
