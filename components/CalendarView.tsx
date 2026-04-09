@@ -75,7 +75,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigat
 
   const techniciansOff = useMemo(() => {
     const dateStr = getLocalDateString(selectedDate);
-    return storageService.getUsers().filter(u => u.isManto && u.leaveDays?.includes(dateStr)).map(u => {
+    return storageService.getUsers().filter(u => (u.isManto || u.role === 'USAC') && u.leaveDays?.includes(dateStr)).map(u => {
       const entry = u.leaveEntries?.find(e => dateStr >= e.startDate && dateStr <= e.endDate);
       return { ...u, leaveType: entry?.type };
     });

@@ -1,9 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Send, User, Clock, MapPin, AlertCircle, Plus, Trash2, CheckSquare, Save, AlertTriangle, Building, Briefcase, Phone, Globe, Info } from 'lucide-react';
+import { X, Send, User, Clock, MapPin, AlertCircle, Plus, Trash2, CheckSquare, Save, AlertTriangle, Building, Briefcase, Phone, Globe, Info, Mic, Loader2 } from 'lucide-react';
 import { CalendarTask, User as UserType, UrgencyLevel, ChecklistItem, ExternalUser, ExternalCategory } from '../types';
 import { storageService } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 interface TaskFormProps {
   user: UserType;
@@ -37,6 +40,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
   const [newCheckItem, setNewCheckItem] = useState('');
   const [team, setTeam] = useState<UserType[]>([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
   
   // External Logic
   const [showExternalModal, setShowExternalModal] = useState(false);
@@ -55,13 +60,33 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
     }
   }, [task]);
 
-  const handleSave = () => {
-    if (!formData.title?.trim()) return alert("El título es obligatorio");
+  const handleSave = async () => {
+    let finalTitle = formData.title?.trim();
+    
+    // Auto-generate title if empty
+    if (!finalTitle && formData.description?.trim()) {
+      setIsProcessingAI(true);
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: `Analiza esta descripción técnica de una tarea de mantenimiento y genera un título corto (máximo 5 palabras) que resuma lo más importante. Solo devuelve el título, nada más.\n\nDescripción: ${formData.description}`,
+        });
+        finalTitle = response.text?.replace(/["*]/g, '').trim() || 'Nueva Tarea';
+        setFormData(prev => ({ ...prev, title: finalTitle }));
+      } catch (error) {
+        console.error("Error generating title:", error);
+        finalTitle = 'Nueva Tarea';
+      } finally {
+        setIsProcessingAI(false);
+      }
+    }
+
+    if (!finalTitle) return alert("El título es obligatorio");
     if (!formData.startDate) return alert("La fecha es obligatoria");
 
     const newTask: CalendarTask = {
       id: task?.id || crypto.randomUUID(),
-      title: formData.title || '',
+      title: finalTitle,
       description: formData.description || '',
       type: formData.type as any || 'Otro',
       startDate: formData.startDate || getLocalDateString(new Date()),
@@ -166,6 +191,71 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
     }));
   };
 
+  const startVoiceDictation = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Tu navegador no soporta el dictado por voz.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'es-ES';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+
+    recognition.onresult = async (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setIsRecording(false);
+      setIsProcessingAI(true);
+
+      try {
+        // AI Cleanup
+        const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: `Eres un asistente técnico experto. He dictado una descripción de una tarea y puede tener errores de reconocimiento o palabras extrañas. Por favor, corrígela para que sea profesional y coherente, manteniendo todos los detalles técnicos. Solo devuelve el texto corregido.\n\nTexto dictado: ${transcript}`,
+        });
+        
+        const correctedText = response.text?.trim() || transcript;
+        setFormData(prev => ({
+          ...prev,
+          description: prev.description ? `${prev.description}\n${correctedText}` : correctedText
+        }));
+
+        // If title is empty, suggest one immediately
+        if (!formData.title?.trim()) {
+          const titleResponse = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `Genera un título corto y profesional para esta tarea: ${correctedText}. Solo devuelve el título.`,
+          });
+          setFormData(prev => ({ ...prev, title: titleResponse.text?.replace(/["*]/g, '').trim() || prev.title }));
+        }
+      } catch (error) {
+        console.error("AI processing error:", error);
+        setFormData(prev => ({
+          ...prev,
+          description: prev.description ? `${prev.description}\n${transcript}` : transcript
+        }));
+      } finally {
+        setIsProcessingAI(false);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognition.start();
+  };
+
   return (
     <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-xl p-4 flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
       <div className="w-full max-w-sm bg-white rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh] relative">
@@ -191,12 +281,21 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
               onChange={e => setFormData({...formData, title: e.target.value})}
               className="w-full text-xl font-black uppercase tracking-tight border-b-2 border-gray-100 py-2 outline-none focus:border-yellow-400 transition-all placeholder:text-gray-200"
             />
-            <textarea 
-              placeholder="Descripción técnica..." 
-              value={formData.description}
-              onChange={e => setFormData({...formData, description: e.target.value})}
-              className="w-full text-xs font-medium text-gray-500 bg-gray-50 p-4 rounded-2xl outline-none resize-none h-20"
-            />
+            <div className="relative">
+              <textarea 
+                placeholder="Descripción técnica..." 
+                value={formData.description}
+                onChange={e => setFormData({...formData, description: e.target.value})}
+                className="w-full text-xs font-medium text-gray-500 bg-gray-50 p-4 pr-12 rounded-2xl outline-none resize-none h-24"
+              />
+              <button 
+                onClick={startVoiceDictation}
+                disabled={isRecording || isProcessingAI}
+                className={`absolute right-3 bottom-3 p-3 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-gray-400 hover:text-yellow-500 shadow-sm'}`}
+              >
+                {isProcessingAI ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           {/* Fecha y Hora */}

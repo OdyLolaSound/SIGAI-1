@@ -514,8 +514,8 @@ const App: React.FC = () => {
            </div>
          </div>
 
-         {/* Gestión de Permisos (Solo para Técnicos Manto) */}
-         {currentUser.isManto && (
+         {/* Gestión de Permisos (Solo para Técnicos Manto y USAC) */}
+         {(currentUser.isManto || currentUser.role === 'USAC' || isMaster) && (
             <div className="space-y-6">
               <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 px-2 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-red-500" /> Calendario Laboral / Permisos
