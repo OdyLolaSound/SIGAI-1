@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, User, Clock, MapPin, AlertCircle, Plus, Trash2, CheckSquare, Save, AlertTriangle, Building, Briefcase, Phone, Globe, Info } from 'lucide-react';
 import { CalendarTask, User as UserType, UrgencyLevel, ChecklistItem, ExternalUser, ExternalCategory } from '../types';
 import { storageService } from '../services/storageService';
+import { getLocalDateString } from '../services/dateUtils';
 
 interface TaskFormProps {
   user: UserType;
@@ -63,23 +64,41 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
       title: formData.title || '',
       description: formData.description || '',
       type: formData.type as any || 'Otro',
-      startDate: formData.startDate,
-      startTime: formData.startTime,
-      endDate: formData.endDate,
-      endTime: formData.endTime,
+      startDate: formData.startDate || getLocalDateString(new Date()),
+      startTime: formData.startTime || null,
+      endDate: formData.endDate || null,
+      endTime: formData.endTime || null,
       priority: formData.priority as UrgencyLevel || 'Media',
       status: formData.status as any || 'Pendiente',
       assignedTo: formData.assignedTo || [],
       externalAssignments: formData.externalAssignments || [],
-      location: formData.location,
+      location: formData.location || '',
       recurrence: formData.recurrence as any || 'No',
       reminder: formData.reminder || [],
       checklist: formData.checklist || [],
-      createdBy: user.id,
+      createdBy: task?.createdBy || user.id,
       createdAt: task?.createdAt || new Date().toISOString()
     };
 
     storageService.saveTask(newTask);
+
+    // Notify assigned users if it's a new task or new assignments
+    const newAssignments = newTask.assignedTo.filter(uid => !task?.assignedTo.includes(uid));
+    newAssignments.forEach(uid => {
+      if (uid !== user.id) {
+        storageService.addNotification({
+          id: crypto.randomUUID(),
+          userId: uid,
+          title: 'Nueva Tarea Asignada',
+          message: `Se te ha asignado la tarea: ${newTask.title}`,
+          type: 'task_assigned',
+          read: false,
+          date: new Date().toISOString(),
+          relatedId: newTask.id
+        });
+      }
+    });
+
     onClose();
   };
 

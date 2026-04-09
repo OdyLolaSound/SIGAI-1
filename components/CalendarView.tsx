@@ -24,9 +24,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigat
 
   useEffect(() => {
     const allTasks = storageService.getTasks();
-    const filteredTasks = allTasks.filter(t => isMaster || t.type === activeUnit);
+    const filteredTasks = allTasks.filter(t => 
+      isMaster || 
+      t.createdBy === user.id || 
+      t.assignedTo.includes(user.id) ||
+      t.type === activeUnit
+    );
     setTasks(filteredTasks);
-  }, [showForm, activeUnit, isMaster]);
+  }, [showForm, activeUnit, isMaster, user.id]);
 
   const daysInMonth = useMemo(() => {
     const year = currentDate.getFullYear();
