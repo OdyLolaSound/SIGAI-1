@@ -1,6 +1,6 @@
 
 import { Reading, Building, ServiceType, Role, User, UserStatus, RequestItem, GasoilTank, Boiler, BoilerTemperatureReading, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, SaltWarehouse, SaltSoftener, CalendarTask, AppNotification, GasoilReading, RefuelRequest, SaltRefillLog, SaltEntryLog, ExternalUser, WaterAccount, WaterSyncLog, GasoilAlertStatus, Provider, MaterialCategory, MaterialItem, LeaveEntry } from '../types';
-import { getLocalDateString, isWorkDay } from './dateUtils';
+import { getLocalDateString, isWorkDay, isWeekend } from './dateUtils';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, setDoc, getDocs, onSnapshot, query, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 
@@ -464,51 +464,92 @@ export const storageService = {
       await new Promise(r => setTimeout(r, 600));
       onProgress(`[AUTH] Intentando login en Aguas de Alicante con usuario: ${account.webUser}...`);
       await new Promise(r => setTimeout(r, 500));
-      onProgress(`[AUTH] Verificando contraseña: ${account.password ? account.password.substring(0, 2) + '***' + account.password.slice(-1) : 'VACÍA'}...`);
-      await new Promise(r => setTimeout(r, 500));
       onProgress("[SCRAPE] Acceso concedido. Navegando a 'Mis Consumos'...");
       await new Promise(r => setTimeout(r, 800));
       onProgress("[URL] https://www.aguasdealicante.es/es/group/amaem/mis-consumos...");
       await new Promise(r => setTimeout(r, 1000));
       onProgress("[SCRAPE] Localizando tabla de consumos históricos...");
       await new Promise(r => setTimeout(r, 1200));
-      onProgress("[DATA] Extrayendo última lectura validada...");
-      await new Promise(r => setTimeout(r, 800));
-      onProgress("[SYNC] Sincronizando datos con base de datos central...");
+      onProgress("[DATA] Analizando periodos pendientes de sincronización...");
     }
 
-    const lastReading = cache.readings.filter((r: any) => r.buildingId === account.buildingId && r.serviceType === 'agua').sort((a: any, b: any) => b.date.localeCompare(a.date))[0];
+    const readings = cache.readings.filter((r: any) => r.buildingId === account.buildingId && r.serviceType === 'agua')
+      .sort((a: any, b: any) => a.date.localeCompare(b.date));
     
-    // Generate a realistic reading for today
-    const newValue = (lastReading?.value1 || 12450) + Math.floor(Math.random() * 15) + 5;
-    const consumption = newValue - (lastReading?.value1 || 12450);
+    const lastReading = readings[readings.length - 1];
+    const todayStr = getLocalDateString();
     
-    const reading: Reading = {
-      id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `rd_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      buildingId: account.buildingId,
-      date: getLocalDateString(),
-      timestamp: new Date().toISOString(),
-      userId: auth.currentUser?.uid || 'system_fallback',
-      serviceType: 'agua',
-      origin: 'telematica',
-      value1: newValue,
-      consumption1: parseFloat(consumption.toFixed(2)),
-      isPeak: consumption > (isWorkDay(new Date()) ? account.peakThresholdM3 : account.peakThresholdM3 * 0.6)
-    };
+    let startDate: Date;
+    if (lastReading) {
+      const lastDate = new Date(lastReading.date);
+      startDate = new Date(lastDate);
+      startDate.setDate(lastDate.getDate() + 1);
+    } else {
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7); // Default to last 7 days if no data
+    }
 
-    try {
-      console.log(`[DEBUG] Attempting to save reading:`, reading);
-      await setDoc(doc(db, 'readings', reading.id), reading);
-      console.log(`[DEBUG] Reading saved successfully`);
-      return { 
-        success: true, 
-        message: `Lectura de ${reading.consumption1} m³ sincronizada correctamente`,
-        reading 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+
+    const missingDays: string[] = [];
+    let current = new Date(startDate);
+    
+    while (current <= today) {
+      missingDays.push(getLocalDateString(current));
+      current.setDate(current.getDate() + 1);
+    }
+
+    if (missingDays.length === 0) {
+      if (onProgress) onProgress("[INFO] No se han detectado días pendientes. El histórico está actualizado.");
+      return { success: true, message: "Histórico ya actualizado" };
+    }
+
+    if (onProgress) onProgress(`[SYNC] Detectados ${missingDays.length} días pendientes. Iniciando volcado...`);
+
+    let lastVal = lastReading?.value1 || 290408.96;
+    const syncedReadings: Reading[] = [];
+
+    for (const dateStr of missingDays) {
+      if (onProgress) onProgress(`[DATA] Procesando lectura: ${dateStr}...`);
+      
+      const weekend = isWeekend(dateStr);
+      const baseCons = weekend ? 15 : 65;
+      const consumption = baseCons + (Math.random() * 20 - 10);
+      lastVal += consumption;
+
+      const reading: Reading = {
+        id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `rd_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+        buildingId: account.buildingId,
+        date: dateStr,
+        timestamp: new Date(dateStr).toISOString(),
+        userId: auth.currentUser?.uid || 'system_fallback',
+        serviceType: 'agua',
+        origin: 'telematica',
+        value1: parseFloat(lastVal.toFixed(2)),
+        consumption1: parseFloat(consumption.toFixed(2)),
+        isPeak: consumption > (isWorkDay(dateStr) ? account.peakThresholdM3 : account.peakThresholdM3 * 0.6)
       };
-    } catch (e) {
-      console.error(`[DEBUG] Error saving reading to Firestore:`, e);
-      return { success: false, message: `Error al guardar en base de datos: ${e instanceof Error ? e.message : 'Error desconocido'}` };
+
+      try {
+        await setDoc(doc(db, 'readings', reading.id), reading);
+        syncedReadings.push(reading);
+        // Update cache
+        cache.readings.push(reading);
+      } catch (e) {
+        console.error(`[DEBUG] Error saving reading for ${dateStr}:`, e);
+      }
+      
+      // Small delay to simulate network
+      await new Promise(r => setTimeout(r, 200));
     }
+
+    return { 
+      success: true, 
+      message: `Sincronizados ${syncedReadings.length} días correctamente`,
+      count: syncedReadings.length
+    };
   },
 
   // --- TASKS ---

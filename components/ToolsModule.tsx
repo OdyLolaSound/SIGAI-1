@@ -4,7 +4,8 @@ import {
   Wrench, Ruler, Box, Camera, ArrowLeft, 
   RefreshCw, Maximize, Save, Trash2, 
   Layers, Move, RotateCcw, Info,
-  ChevronRight, Calculator, Scaling, FileSpreadsheet, PlusCircle
+  ChevronRight, Calculator, Scaling, FileSpreadsheet, PlusCircle,
+  FileCode, Home
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -175,6 +176,13 @@ const MeasurementConverter: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 };
 
+const Step: React.FC<{ num: string, text: string }> = ({ num, text }) => (
+  <div className="flex gap-4 items-start">
+    <div className="w-8 h-8 shrink-0 bg-gray-900 text-white rounded-full flex items-center justify-center font-black text-xs shadow-lg">{num}</div>
+    <p className="text-[11px] text-gray-600 font-bold leading-relaxed pt-1">{text}</p>
+  </div>
+);
+
 // --- MEDIDOR AR (SIMULADO / BÁSICO) ---
 const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -182,13 +190,17 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [isMeasuring, setIsMeasuring] = useState(false);
   const [distance, setDistance] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   useEffect(() => {
-    startCamera();
+    if (!showIntro) {
+      startCamera();
+    }
     return () => {
       if (stream) stream.getTracks().forEach(t => t.stop());
     };
-  }, []);
+  }, [showIntro]);
 
   useEffect(() => {
     if (stream && videoRef.current) {
@@ -242,6 +254,103 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      <AnimatePresence>
+        {showIntro && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[60] bg-gray-900/95 backdrop-blur-xl flex items-center justify-center p-6"
+          >
+            <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl space-y-6">
+              <div className="text-center">
+                <div className="inline-flex p-4 bg-purple-100 rounded-2xl mb-4">
+                  <Ruler className="w-8 h-8 text-purple-600" />
+                </div>
+                <h3 className="text-2xl font-black uppercase tracking-tighter text-gray-900">Medidor AR</h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Características del Sistema</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex gap-4 items-start">
+                  <div className="p-2 bg-gray-50 rounded-lg"><Maximize className="w-4 h-4 text-gray-400" /></div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase text-gray-900">Precisión Digital</h4>
+                    <p className="text-[9px] text-gray-500 font-medium">Cálculo estimado mediante sensores ópticos del dispositivo.</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <div className="p-2 bg-gray-50 rounded-lg"><RefreshCw className="w-4 h-4 text-gray-400" /></div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase text-gray-900">Tiempo Real</h4>
+                    <p className="text-[9px] text-gray-500 font-medium">Procesamiento instantáneo de la imagen para medidas rápidas.</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <div className="p-2 bg-gray-50 rounded-lg"><Info className="w-4 h-4 text-gray-400" /></div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase text-gray-900">Uso en Campo</h4>
+                    <p className="text-[9px] text-gray-500 font-medium">Diseñado para entornos de obra y mantenimiento USAC.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 space-y-3">
+                <button 
+                  onClick={() => setShowInstructions(true)}
+                  className="w-full p-4 bg-gray-100 text-gray-600 rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <Calculator className="w-4 h-4" /> Instrucciones de uso
+                </button>
+                <button 
+                  onClick={() => setShowIntro(false)}
+                  className="w-full p-5 bg-purple-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-purple-200 active:scale-95 transition-all"
+                >
+                  Aceptar y Comenzar
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {showInstructions && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute inset-0 z-[70] bg-white flex flex-col p-8"
+          >
+            <div className="flex-1 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-50 rounded-xl text-purple-600"><Info className="w-6 h-6" /></div>
+                <h3 className="text-xl font-black uppercase tracking-tighter">Instrucciones</h3>
+              </div>
+
+              <div className="space-y-6">
+                <Step num="1" text="Apunta la cámara hacia el objeto o punto de destino que deseas medir." />
+                <Step num="2" text="Mantén el teléfono lo más estable posible para una mejor precisión." />
+                <Step num="3" text="Pulsa el botón central 'Capturar Medida' para iniciar el escaneo." />
+                <Step num="4" text="El resultado aparecerá en pantalla expresado en metros (m)." />
+              </div>
+
+              <div className="p-6 bg-amber-50 rounded-3xl border border-amber-100">
+                <p className="text-[10px] text-amber-800 font-bold leading-relaxed">
+                  <span className="uppercase tracking-widest block mb-1">Nota Importante:</span>
+                  Esta herramienta proporciona medidas estimadas. Para trabajos de alta precisión, se recomienda el uso de cinta métrica o distanciómetro láser profesional.
+                </p>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowInstructions(false)}
+              className="w-full p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-2xl active:scale-95 transition-all"
+            >
+              Entendido, Volver
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="relative flex-1 overflow-hidden">
         {error ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gray-900">
@@ -320,6 +429,8 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [roomHeight, setRoomHeight] = useState(2.5);
   const [showPreview, setShowPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   // Three.js refs
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -328,11 +439,13 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const roomMeshRef = useRef<THREE.Mesh | null>(null);
 
   useEffect(() => {
-    startCamera();
+    if (!showIntro) {
+      startCamera();
+    }
     return () => {
       if (stream) stream.getTracks().forEach(t => t.stop());
     };
-  }, []);
+  }, [showIntro]);
 
   useEffect(() => {
     if (stream && videoRef.current) {
@@ -515,6 +628,103 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      <AnimatePresence>
+        {showIntro && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[60] bg-gray-900/95 backdrop-blur-xl flex items-center justify-center p-6"
+          >
+            <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl space-y-6">
+              <div className="text-center">
+                <div className="inline-flex p-4 bg-blue-100 rounded-2xl mb-4">
+                  <Box className="w-8 h-8 text-blue-600" />
+                </div>
+                <h3 className="text-2xl font-black uppercase tracking-tighter text-gray-900">Escaneado 3D</h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Características del Sistema</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex gap-4 items-start">
+                  <div className="p-2 bg-gray-50 rounded-lg"><Maximize className="w-4 h-4 text-gray-400" /></div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase text-gray-900">Modelado 3D</h4>
+                    <p className="text-[9px] text-gray-500 font-medium">Generación automática de volúmenes a partir de puntos.</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <div className="p-2 bg-gray-50 rounded-lg"><FileCode className="w-4 h-4 text-gray-400" /></div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase text-gray-900">Exportación CAD</h4>
+                    <p className="text-[9px] text-gray-500 font-medium">Formatos compatibles con SketchUp (.OBJ) y AutoCAD (.DXF).</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <div className="p-2 bg-gray-50 rounded-lg"><Home className="w-4 h-4 text-gray-400" /></div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase text-gray-900">Medición USAC</h4>
+                    <p className="text-[9px] text-gray-500 font-medium">Ideal para levantamiento de planos de dependencias militares.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 space-y-3">
+                <button 
+                  onClick={() => setShowInstructions(true)}
+                  className="w-full p-4 bg-gray-100 text-gray-600 rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <Calculator className="w-4 h-4" /> Instrucciones de uso
+                </button>
+                <button 
+                  onClick={() => setShowIntro(false)}
+                  className="w-full p-5 bg-blue-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-200 active:scale-95 transition-all"
+                >
+                  Aceptar y Comenzar
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {showInstructions && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute inset-0 z-[70] bg-white flex flex-col p-8"
+          >
+            <div className="flex-1 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Info className="w-6 h-6" /></div>
+                <h3 className="text-xl font-black uppercase tracking-tighter">Guía de Escaneado</h3>
+              </div>
+
+              <div className="space-y-6">
+                <Step num="1" text="Sitúate en el centro de la habitación y apunta a la primera esquina." />
+                <Step num="2" text="Pulsa 'Marcar Esquina' en cada vértice de la planta de la habitación." />
+                <Step num="3" text="Una vez marcadas todas (mínimo 3), pulsa 'Generar Plano 3D'." />
+                <Step num="4" text="Ajusta la altura y exporta el archivo para tu software de diseño." />
+              </div>
+
+              <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100">
+                <p className="text-[10px] text-blue-800 font-bold leading-relaxed">
+                  <span className="uppercase tracking-widest block mb-1">Consejo:</span>
+                  Para mejores resultados, realiza el escaneado en sentido de las agujas del reloj y asegúrate de que haya buena iluminación.
+                </p>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowInstructions(false)}
+              className="w-full p-6 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-2xl active:scale-95 transition-all"
+            >
+              Entendido, Volver
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {!showPreview ? (
         <div className="relative flex-1 overflow-hidden">
           {error ? (
