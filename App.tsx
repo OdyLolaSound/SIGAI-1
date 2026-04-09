@@ -34,6 +34,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(storageService.getCurrentUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authRole, setAuthRole] = useState<Role | null>(null);
+  const [authInitialView, setAuthInitialView] = useState<'login' | 'register'>('login');
   
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(() => {
     const saved = localStorage.getItem('sigai_selected_building');
@@ -187,6 +188,7 @@ const App: React.FC = () => {
       return;
     }
     setAuthRole(role);
+    setAuthInitialView('login');
     setShowAuthModal(true);
   };
 
@@ -417,7 +419,11 @@ const App: React.FC = () => {
 
           <div className="w-full px-2 mt-8 space-y-4">
             <button 
-              onClick={() => { setAuthRole('USAC'); setShowAuthModal(true); }}
+              onClick={() => { 
+                setAuthRole('USAC'); 
+                setAuthInitialView('register');
+                setShowAuthModal(true); 
+              }}
               className="w-full p-6 bg-white border-2 border-gray-900 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[11px] shadow-lg flex items-center justify-center gap-4 active:scale-95 transition-all"
             >
               <UserPlus className="w-5 h-5" /> Solicitar Registro / Alta Técnico
@@ -628,12 +634,16 @@ const App: React.FC = () => {
         </div>
 
         <div className="w-full px-2 mt-8 space-y-4">
-          <button 
-            onClick={() => { setAuthRole('USAC'); setShowAuthModal(true); }}
-            className="w-full p-6 bg-white border-2 border-gray-900 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[11px] shadow-lg flex items-center justify-center gap-4 active:scale-95 transition-all"
-          >
-            <UserPlus className="w-5 h-5" /> Solicitar Registro / Alta Técnico
-          </button>
+            <button 
+              onClick={() => { 
+                setAuthRole('USAC'); 
+                setAuthInitialView('register');
+                setShowAuthModal(true); 
+              }}
+              className="w-full p-6 bg-white border-2 border-gray-900 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[11px] shadow-lg flex items-center justify-center gap-4 active:scale-95 transition-all"
+            >
+              <UserPlus className="w-5 h-5" /> Solicitar Registro / Alta Técnico
+            </button>
 
           {isAuthorized && (
             <button onClick={() => setActiveTab(AppTab.ADMIN)} className="w-full p-6 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all">
@@ -663,7 +673,14 @@ const App: React.FC = () => {
           </div>
         ) : renderContent()}
       </div>
-      {showAuthModal && authRole && <AuthModal initialRole={authRole} onLogin={handleLoginSuccess} onClose={() => setShowAuthModal(false)} />}
+      {showAuthModal && authRole && (
+        <AuthModal 
+          initialRole={authRole} 
+          initialView={authInitialView}
+          onLogin={handleLoginSuccess} 
+          onClose={() => setShowAuthModal(false)} 
+        />
+      )}
     </Layout>
   );
 };

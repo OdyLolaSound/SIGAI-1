@@ -5,17 +5,18 @@ import { Role, User } from '../types';
 import { storageService } from '../services/storageService';
 
 import { auth, db } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 interface AuthModalProps {
   initialRole: Role;
+  initialView?: 'login' | 'register';
   onLogin: (user: User) => void;
   onClose: () => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) => {
-  const [view, setView] = useState<'login' | 'register' | 'pending' | 'complementary'>('login');
+const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login', onLogin, onClose }) => {
+  const [view, setView] = useState<'login' | 'register' | 'pending' | 'complementary'>(initialView);
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -28,59 +29,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-
-      // Check if user exists in Firestore
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      
-      if (userDoc.exists()) {
-        const user = userDoc.data() as User;
-        if (user.status !== 'approved' && user.role !== 'MASTER') {
-          setView('pending');
-        } else {
-          onLogin(user);
-        }
-      } else {
-        // Create new user from Google profile
-        const newUser: User = {
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Usuario Google',
-          username: firebaseUser.email?.split('@')[0] || 'google_user',
-          password: '',
-          role: firebaseUser.email === 'JCYebenes@gmail.com' ? 'MASTER' : initialRole,
-          status: firebaseUser.email === 'JCYebenes@gmail.com' ? 'approved' : 'pending',
-          assignedBuildings: [],
-          assignedUnits: [],
-          phone: '',
-          isManto: false,
-          leaveDays: []
-        };
-        await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-        
-        if (newUser.status === 'approved') {
-          onLogin(newUser);
-        } else {
-          setView('pending');
-        }
-      }
-    } catch (err: any) {
-      console.error("Google Login error:", err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setError('El acceso con Google no está habilitado en la consola de Firebase.');
-      } else {
-        setError('Error al acceder con Google');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,27 +246,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
           <form onSubmit={view === 'login' ? handleLogin : handleRegister} className="space-y-4">
             {error && <div className="p-4 bg-red-50 text-red-600 text-[10px] font-black rounded-2xl border border-red-100 uppercase">{error}</div>}
             
-            {view === 'login' && (
-              <button 
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={loading}
-                className="w-full p-5 bg-white border-2 border-gray-100 text-gray-900 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-sm flex items-center justify-center gap-3 active:scale-95 transition-all hover:border-tactical-orange/30 mb-6"
-              >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" referrerPolicy="no-referrer" />
-                Entrar con Google
-              </button>
-            )}
-
-            {view === 'login' && (
-              <div className="relative flex items-center justify-center mb-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-100"></div>
-                </div>
-                <span className="relative px-4 bg-white text-[9px] font-black text-gray-300 uppercase tracking-widest">O con Usuario</span>
-              </div>
-            )}
-
             {view === 'register' && (
               <div className="relative">
                 <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -405,7 +332,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, onLogin, onClose }) 
 
         <div className="p-8 bg-gray-50 text-center flex flex-col gap-4 border-t border-gray-100">
           {view === 'login' ? (
-            <button onClick={() => setView('register')} className="text-[10px] font-black uppercase text-gray-400 hover:text-tactical-orange transition-colors flex items-center justify-center gap-2">
+            <button 
+              onClick={() => setView('register')} 
+              className="w-full p-4 bg-white border-2 border-gray-900 text-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all flex items-center justify-center gap-2 active:scale-95"
+            >
               <UserPlus className="w-4 h-4" /> Solicitar Registro en {initialRole}
             </button>
           ) : (
