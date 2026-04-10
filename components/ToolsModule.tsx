@@ -5,14 +5,31 @@ import {
   RefreshCw, Maximize, Save, Trash2, 
   Layers, Move, RotateCcw, Info,
   ChevronRight, Calculator, Scaling, FileSpreadsheet, PlusCircle,
-  FileCode, Home, CheckCircle, Target, Smartphone
+  FileCode, Home, CheckCircle, Target, Smartphone, Zap, Flame, Droplets,
+  Download, Plus, Cloud, FolderOpen, FileUp, FileDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  query, 
+  where, 
+  serverTimestamp, 
+  doc, 
+  deleteDoc,
+  orderBy
+} from 'firebase/firestore';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 import * as THREE from 'three';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 
-type ToolType = 'menu' | 'converter' | 'ar_measure' | 'scan_3d' | 'level';
+type CategoryType = 'menu' | 'medidas' | 'electricidad';
+type ToolType = 'none' | 'converter' | 'ar_measure' | 'scan_3d' | 'level' | 'panel_designer';
 
 interface Point3D {
   x: number;
@@ -21,27 +38,37 @@ interface Point3D {
 }
 
 const ToolsModule: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const [activeTool, setActiveTool] = useState<ToolType>('menu');
+  const [activeCategory, setActiveCategory] = useState<CategoryType>('menu');
+  const [activeTool, setActiveTool] = useState<ToolType>('none');
 
   const renderTool = () => {
-    switch (activeTool) {
-      case 'converter':
-        return <MeasurementConverter onBack={() => setActiveTool('menu')} />;
-      case 'ar_measure':
-        return <ARMeasureTool onBack={() => setActiveTool('menu')} />;
-      case 'scan_3d':
-        return <Scan3DTool onBack={() => setActiveTool('menu')} />;
-      case 'level':
-        return <LevelTool onBack={() => setActiveTool('menu')} />;
-      default:
+    if (activeTool !== 'none') {
+      switch (activeTool) {
+        case 'converter':
+          return <MeasurementConverter onBack={() => setActiveTool('none')} />;
+        case 'ar_measure':
+          return <ARMeasureTool onBack={() => setActiveTool('none')} />;
+        case 'scan_3d':
+          return <Scan3DTool onBack={() => setActiveTool('none')} />;
+        case 'level':
+          return <LevelTool onBack={() => setActiveTool('none')} />;
+        case 'panel_designer':
+          return <ElectricalPanelDesigner onBack={() => setActiveTool('none')} />;
+        default:
+          return null;
+      }
+    }
+
+    switch (activeCategory) {
+      case 'medidas':
         return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="text-center mb-8">
-              <div className="inline-flex p-4 bg-yellow-400 rounded-3xl mb-4 shadow-xl">
-                <Wrench className="w-8 h-8 text-black" />
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={() => setActiveCategory('menu')} className="p-3 bg-gray-100 rounded-2xl"><ArrowLeft className="w-5 h-5" /></button>
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tighter">Medidas y Planos</h3>
+                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Herramientas de precisión</p>
               </div>
-              <h2 className="text-3xl font-black uppercase tracking-tighter">Herramientas</h2>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">Utilidades de Campo USAC</p>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
@@ -72,6 +99,57 @@ const ToolsModule: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 desc="Nivelación de superficies"
                 onClick={() => setActiveTool('level')}
                 color="bg-green-50 border-green-100 text-green-900"
+              />
+            </div>
+          </div>
+        );
+      case 'electricidad':
+        return (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={() => setActiveCategory('menu')} className="p-3 bg-gray-100 rounded-2xl"><ArrowLeft className="w-5 h-5" /></button>
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tighter">Electricidad</h3>
+                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Cálculo y diseño eléctrico</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              <ToolCard 
+                icon={<FileCode className="w-6 h-6" />}
+                title="Diseñador de Cuadros"
+                desc="Esquemas de cuadros eléctricos"
+                onClick={() => setActiveTool('panel_designer')}
+                color="bg-orange-50 border-orange-100 text-orange-900"
+              />
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center mb-8">
+              <div className="inline-flex p-4 bg-yellow-400 rounded-3xl mb-4 shadow-xl">
+                <Wrench className="w-8 h-8 text-black" />
+              </div>
+              <h2 className="text-3xl font-black uppercase tracking-tighter">Herramientas</h2>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">Utilidades de Campo USAC</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              <CategoryCard 
+                icon={<Scaling className="w-6 h-6" />}
+                title="Medidas y Planos"
+                desc="Conversor, AR, 3D y Nivel"
+                onClick={() => setActiveCategory('medidas')}
+                color="bg-white border-gray-100"
+              />
+              <CategoryCard 
+                icon={<Zap className="w-6 h-6" />}
+                title="Electricidad"
+                desc="Diseño de cuadros y cálculos"
+                onClick={() => setActiveCategory('electricidad')}
+                color="bg-white border-gray-100"
               />
             </div>
 
@@ -108,6 +186,26 @@ const ToolCard: React.FC<{ icon: React.ReactNode, title: string, desc: string, o
       </div>
     </div>
     <ChevronRight className="w-5 h-5 opacity-20 group-hover:translate-x-1 transition-transform" />
+  </button>
+);
+
+const CategoryCard: React.FC<{ icon: React.ReactNode, title: string, desc: string, onClick: () => void, color: string }> = ({ icon, title, desc, onClick, color }) => (
+  <button 
+    onClick={onClick}
+    className={`${color} border-2 rounded-[2.5rem] p-6 text-left flex items-center justify-between transition-all active:scale-95 group shadow-sm`}
+  >
+    <div className="flex items-center gap-4">
+      <div className="p-4 bg-gray-900 text-yellow-400 rounded-2xl shadow-xl">
+        {icon}
+      </div>
+      <div>
+        <h4 className="font-black text-sm uppercase leading-none mb-1 text-gray-900">{title}</h4>
+        <p className="text-gray-400 text-[9px] font-bold uppercase tracking-widest">{desc}</p>
+      </div>
+    </div>
+    <div className="p-2 bg-gray-50 rounded-xl group-hover:bg-gray-100 transition-colors">
+      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
+    </div>
   </button>
 );
 
@@ -1078,5 +1176,968 @@ const LevelTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     </div>
   );
 };
+
+// --- DISEÑADOR DE CUADROS ELÉCTRICOS ---
+interface Appliance {
+  id: string;
+  name: string;
+  type: 'lighting' | 'socket' | 'oven' | 'washing' | 'dishwasher' | 'heater' | 'ac' | 'special';
+  power?: number; // Watts
+}
+
+interface Room {
+  id: string;
+  name: string;
+  appliances: Appliance[];
+}
+
+interface Circuit {
+  id: string;
+  code: string;
+  label: string;
+  amps: number;
+  cable: string;
+  appliances: string[];
+  idGroup: number; // Which differential it belongs to
+}
+
+const DINModule: React.FC<{ 
+  type: 'IGA' | 'PCS' | 'ID' | 'PIA', 
+  label: string, 
+  amps?: number, 
+  color?: string,
+  width?: string 
+}> = ({ type, label, amps, color = 'bg-gray-200', width = 'w-16' }) => (
+  <div className={`${width} h-32 ${color} rounded-md border-x-2 border-gray-400 shadow-md flex flex-col items-center py-2 relative shrink-0`}>
+    <div className="w-full h-1 bg-gray-400 absolute top-4" />
+    <div className="w-full h-1 bg-gray-400 absolute bottom-4" />
+    
+    <div className="text-[7px] font-black uppercase text-gray-600 mb-1">{type}</div>
+    <div className="bg-white/50 px-1 rounded text-[6px] font-bold mb-2 truncate w-full text-center">{label}</div>
+    
+    {/* Switch */}
+    <div className="w-4 h-10 bg-gray-300 rounded border border-gray-400 flex flex-col items-center justify-between p-1 shadow-inner my-1">
+      <div className="w-full h-4 bg-gray-400 rounded-sm" />
+      <div className="w-full h-1 bg-red-500 rounded-full" />
+    </div>
+
+    {amps && (
+      <div className="mt-auto text-[10px] font-black font-mono text-gray-800">
+        {type === 'ID' ? '40A/30mA' : `${amps}A`}
+      </div>
+    )}
+    
+    {/* Status Indicator */}
+    <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-green-500 border border-white/50" />
+  </div>
+);
+
+interface BudgetItem {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
+const ElectricalPanelDesigner: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const [step, setStep] = useState<'input' | 'result'>('input');
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [showCustomAppliance, setShowCustomAppliance] = useState(false);
+  const [customAppName, setCustomAppName] = useState('');
+  const [budget, setBudget] = useState<BudgetItem[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedDesigns, setSavedDesigns] = useState<any[]>([]);
+  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [projectName, setProjectName] = useState('Mi Proyecto Eléctrico');
+  
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (auth.currentUser) {
+      fetchSavedDesigns();
+    }
+  }, []);
+
+  const saveToFirestore = async () => {
+    if (!auth.currentUser) {
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        console.error("Error logging in:", error);
+        return;
+      }
+    }
+
+    setIsSaving(true);
+    try {
+      const designData = {
+        userId: auth.currentUser?.uid,
+        name: projectName,
+        rooms,
+        circuits,
+        budget,
+        createdAt: serverTimestamp()
+      };
+      await addDoc(collection(db, 'electrical_designs'), designData);
+      alert("Proyecto guardado correctamente en la nube.");
+      fetchSavedDesigns();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'electrical_designs');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const fetchSavedDesigns = async () => {
+    if (!auth.currentUser) return;
+    try {
+      const q = query(
+        collection(db, 'electrical_designs'), 
+        where('userId', '==', auth.currentUser.uid),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const designs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSavedDesigns(designs);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'electrical_designs');
+    }
+  };
+
+  const loadDesign = (design: any) => {
+    setRooms(design.rooms);
+    setCircuits(design.circuits || []);
+    setBudget(design.budget || []);
+    setProjectName(design.name);
+    setStep('input');
+    setShowSavedModal(false);
+  };
+
+  const deleteDesign = async (id: string) => {
+    if (!confirm("¿Seguro que quieres borrar este proyecto?")) return;
+    try {
+      await deleteDoc(doc(db, 'electrical_designs', id));
+      fetchSavedDesigns();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'electrical_designs');
+    }
+  };
+
+  const exportToJSON = () => {
+    const data = {
+      name: projectName,
+      rooms,
+      circuits,
+      budget,
+      version: '1.0'
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${projectName.replace(/\s+/g, '_')}_export.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importFromJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.rooms) {
+          setRooms(data.rooms);
+          setCircuits(data.circuits || []);
+          setBudget(data.budget || []);
+          setProjectName(data.name || 'Proyecto Importado');
+          alert("Proyecto importado con éxito.");
+        }
+      } catch (error) {
+        alert("Error al importar el archivo. Formato no válido.");
+      }
+    };
+    reader.readAsText(file);
+  };
+  
+  // Default rooms and appliances
+  const defaultRooms: Room[] = [
+    {
+      id: 'def-salon',
+      name: 'Salón',
+      appliances: [
+        { id: 's1', name: 'Punto de Luz', type: 'lighting' },
+        { id: 's2', name: 'Toma de Corriente', type: 'socket' },
+        { id: 's3', name: 'Toma de Corriente', type: 'socket' },
+        { id: 's4', name: 'Aire Acondicionado', type: 'ac' }
+      ]
+    },
+    {
+      id: 'def-cocina',
+      name: 'Cocina',
+      appliances: [
+        { id: 'k1', name: 'Punto de Luz', type: 'lighting' },
+        { id: 'k2', name: 'Cocina/Horno', type: 'oven' },
+        { id: 'k3', name: 'Lavadora', type: 'washing' },
+        { id: 'k4', name: 'Lavavajillas', type: 'dishwasher' },
+        { id: 'k5', name: 'Toma de Corriente', type: 'socket' },
+        { id: 'k6', name: 'Toma de Corriente', type: 'socket' }
+      ]
+    },
+    {
+      id: 'def-bano',
+      name: 'Baño',
+      appliances: [
+        { id: 'b1', name: 'Punto de Luz', type: 'lighting' },
+        { id: 'b2', name: 'Toma de Corriente', type: 'socket' },
+        { id: 'b3', name: 'Termo Eléctrico', type: 'heater' }
+      ]
+    }
+  ];
+
+  const [rooms, setRooms] = useState<Room[]>(defaultRooms);
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(defaultRooms[0].id);
+  const [circuits, setCircuits] = useState<Circuit[]>([]);
+
+  const addRoom = () => {
+    if (newRoomName.trim()) {
+      const newRoom: Room = { id: crypto.randomUUID(), name: newRoomName, appliances: [] };
+      setRooms([...rooms, newRoom]);
+      setActiveRoomId(newRoom.id);
+      setNewRoomName('');
+      setShowRoomModal(false);
+    }
+  };
+
+  const handleAddCustomAppliance = () => {
+    if (customAppName.trim() && activeRoomId) {
+      const lower = customAppName.toLowerCase();
+      let type: Appliance['type'] = 'socket';
+      if (lower.includes('luz') || lower.includes('lampara')) type = 'lighting';
+      else if (lower.includes('horno') || lower.includes('vitro')) type = 'oven';
+      else if (lower.includes('lavadora')) type = 'washing';
+      else if (lower.includes('lavavajillas')) type = 'dishwasher';
+      else if (lower.includes('termo') || lower.includes('calentador')) type = 'heater';
+      else if (lower.includes('aire') || lower.includes('ac')) type = 'ac';
+      else if (lower.includes('coche') || lower.includes('piscina') || lower.includes('depuradora')) type = 'special';
+      
+      addAppliance(activeRoomId, type, customAppName);
+      setCustomAppName('');
+      setShowCustomAppliance(false);
+    }
+  };
+
+  const addAppliance = (roomId: string, type: Appliance['type'], name: string) => {
+    setRooms(rooms.map(r => {
+      if (r.id === roomId) {
+        return {
+          ...r,
+          appliances: [...r.appliances, { id: crypto.randomUUID(), type, name }]
+        };
+      }
+      return r;
+    }));
+  };
+
+  const removeAppliance = (roomId: string, applianceId: string) => {
+    setRooms(rooms.map(r => {
+      if (r.id === roomId) {
+        return {
+          ...r,
+          appliances: r.appliances.filter(a => a.id !== applianceId)
+        };
+      }
+      return r;
+    }));
+  };
+
+  const removeRoom = (id: string) => {
+    setRooms(rooms.filter(r => r.id !== id));
+    if (activeRoomId === id) setActiveRoomId(null);
+  };
+
+  const getRecommendations = (roomName: string): { label: string, type: Appliance['type'], name: string }[] => {
+    const name = roomName.toLowerCase();
+    const common = [
+      { label: 'Punto de Luz', type: 'lighting' as const, name: 'Punto de Luz' },
+      { label: 'Enchufe', type: 'socket' as const, name: 'Toma de Corriente' },
+    ];
+
+    if (name.includes('cocina')) {
+      return [
+        ...common,
+        { label: 'Horno/Vitro', type: 'oven', name: 'Cocina/Horno' },
+        { label: 'Lavadora', type: 'washing', name: 'Lavadora' },
+        { label: 'Lavavajillas', type: 'dishwasher', name: 'Lavavajillas' },
+        { label: 'Nevera', type: 'socket', name: 'Nevera' },
+        { label: 'Microondas', type: 'socket', name: 'Microondas' },
+      ];
+    }
+    if (name.includes('baño') || name.includes('aseo')) {
+      return [
+        ...common,
+        { label: 'Termo Eléctrico', type: 'heater', name: 'Termo Eléctrico' },
+        { label: 'Enchufe Espejo', type: 'socket', name: 'Toma Espejo' },
+        { label: 'Extractor', type: 'lighting', name: 'Extractor' },
+      ];
+    }
+    if (name.includes('salón') || name.includes('comedor') || name.includes('estar')) {
+      return [
+        ...common,
+        { label: 'Aire Acondicionado', type: 'ac', name: 'Aire Acondicionado' },
+        { label: 'Televisión', type: 'socket', name: 'Televisión' },
+        { label: 'Home Cinema', type: 'socket', name: 'Home Cinema' },
+      ];
+    }
+    if (name.includes('dormitorio') || name.includes('habitación')) {
+      return [
+        ...common,
+        { label: 'Aire Acondicionado', type: 'ac', name: 'Aire Acondicionado' },
+        { label: 'Enchufe Mesita', type: 'socket', name: 'Toma Mesita' },
+      ];
+    }
+    if (name.includes('garaje') || name.includes('cochera')) {
+      return [
+        ...common,
+        { label: 'Cargador Coche Eléctrico', type: 'special', name: 'Cargador Vehículo Eléctrico' },
+        { label: 'Puerta Automática', type: 'socket', name: 'Motor Puerta' },
+      ];
+    }
+    if (name.includes('piscina') || name.includes('jardín') || name.includes('exterior')) {
+      return [
+        ...common,
+        { label: 'Bomba Piscina', type: 'special', name: 'Bomba de Piscina' },
+        { label: 'Depuradora', type: 'special', name: 'Depuradora' },
+        { label: 'Focos Piscina', type: 'lighting', name: 'Iluminación Exterior' },
+      ];
+    }
+    return [
+      ...common,
+      { label: 'Aire Acondicionado', type: 'ac', name: 'Aire Acondicionado' },
+    ];
+  };
+
+  const generateDesign = () => {
+    if (rooms.length === 0) {
+      alert("Añade al menos una habitación.");
+      return;
+    }
+
+    const newCircuits: Circuit[] = [];
+    const allAppliances = rooms.flatMap(r => r.appliances.map(a => ({ ...a, roomName: r.name })));
+
+    // C1: Lighting
+    const lighting = allAppliances.filter(a => a.type === 'lighting');
+    if (lighting.length > 0) {
+      newCircuits.push({
+        id: 'c1', code: 'C1', label: 'Alumbrado', amps: 10, cable: '1.5 mm²', idGroup: 0,
+        appliances: lighting.map(a => `${a.name} (${a.roomName})`)
+      });
+    }
+
+    // C2: General Sockets
+    const sockets = allAppliances.filter(a => a.type === 'socket' && !['Cocina', 'Baño'].includes(a.roomName));
+    if (sockets.length > 0) {
+      newCircuits.push({
+        id: 'c2', code: 'C2', label: 'Tomas Generales', amps: 16, cable: '2.5 mm²', idGroup: 0,
+        appliances: sockets.map(a => `${a.name} (${a.roomName})`)
+      });
+    }
+
+    // C5: Wet area sockets (Kitchen/Bath)
+    const wetSockets = allAppliances.filter(a => a.type === 'socket' && ['Cocina', 'Baño'].includes(a.roomName));
+    if (wetSockets.length > 0) {
+      newCircuits.push({
+        id: 'c5', code: 'C5', label: 'Baños y Cocina', amps: 16, cable: '2.5 mm²', idGroup: 0,
+        appliances: wetSockets.map(a => `${a.name} (${a.roomName})`)
+      });
+    }
+
+    // C3: Oven/Cooker
+    const ovens = allAppliances.filter(a => a.type === 'oven');
+    ovens.forEach((o, i) => {
+      newCircuits.push({
+        id: `c3-${i}`, code: 'C3', label: 'Cocina y Horno', amps: 25, cable: '6 mm²', idGroup: 0,
+        appliances: [`${o.name} (${o.roomName})`]
+      });
+    });
+
+    // C4: Large Appliances
+    const c4Items = allAppliances.filter(a => ['washing', 'dishwasher', 'heater'].includes(a.type));
+    c4Items.forEach((item, i) => {
+      newCircuits.push({
+        id: `c4-${i}`, code: 'C4', 
+        label: item.type === 'washing' ? 'Lavadora' : item.type === 'dishwasher' ? 'Lavavajillas' : 'Termo Eléctrico',
+        amps: 20, cable: '4 mm²', idGroup: 0,
+        appliances: [`${item.name} (${item.roomName})`]
+      });
+    });
+
+    // C12: AC
+    const acs = allAppliances.filter(a => a.type === 'ac');
+    acs.forEach((ac, i) => {
+      newCircuits.push({
+        id: `c12-${i}`, code: 'C12', label: 'Aire Acondic.', amps: 25, cable: '6 mm²', idGroup: 0,
+        appliances: [`${ac.name} (${ac.roomName})`]
+      });
+    });
+
+    // C13: EV Charger (REBT ITC-BT-52)
+    const evChargers = allAppliances.filter(a => a.name.toLowerCase().includes('coche') || a.name.toLowerCase().includes('vehículo eléctrico'));
+    evChargers.forEach((ev, i) => {
+      newCircuits.push({
+        id: `c13-${i}`, code: 'C13', label: 'Vehículo Eléctrico', amps: 32, cable: '10 mm²', idGroup: 0,
+        appliances: [`${ev.name} (${ev.roomName})`]
+      });
+    });
+
+    // C14: Pool / Garden
+    const poolItems = allAppliances.filter(a => a.name.toLowerCase().includes('piscina') || a.name.toLowerCase().includes('depuradora'));
+    if (poolItems.length > 0) {
+      newCircuits.push({
+        id: 'c14', code: 'C14', label: 'Piscina / Exterior', amps: 16, cable: '2.5 mm²', idGroup: 0,
+        appliances: poolItems.map(a => `${a.name} (${a.roomName})`)
+      });
+    }
+
+    // Assign groups (Max 5 PIAs per Differential)
+    let currentGroup = 1;
+    newCircuits.forEach((c, i) => {
+      c.idGroup = Math.floor(i / 5) + 1;
+    });
+
+    setCircuits(newCircuits);
+    
+    // Generate initial budget
+    const initialBudget: BudgetItem[] = [
+      { id: 'b-iga', name: 'IGA 40A 2P', quantity: 1, price: 28.50 },
+      { id: 'b-pcs', name: 'Protector Sobretensiones (PCS)', quantity: 1, price: 85.00 },
+    ];
+
+    const diffCount = [...new Set(newCircuits.map(c => c.idGroup))].length;
+    initialBudget.push({ id: 'b-id', name: 'Diferencial 40A/30mA Clase AC', quantity: diffCount, price: 35.00 * diffCount });
+
+    newCircuits.forEach(c => {
+      let price = 12.00;
+      if (c.amps >= 25) price = 18.00;
+      initialBudget.push({ id: `b-${c.id}`, name: `PIA ${c.amps}A (${c.code})`, quantity: 1, price });
+    });
+
+    initialBudget.push({ id: 'b-box', name: 'Cuadro Eléctrico Empotrar 24 Módulos', quantity: 1, price: 45.00 });
+    
+    setBudget(initialBudget);
+    setStep('result');
+  };
+
+  const exportToPDF = async () => {
+    if (!reportRef.current) return;
+    setIsExporting(true);
+    
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save('Memoria_Tecnica_Cuadro_USAC.pdf');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const updateBudgetItem = (id: string, field: keyof BudgetItem, value: any) => {
+    setBudget(budget.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  const removeBudgetItem = (id: string) => {
+    setBudget(budget.filter(item => item.id !== id));
+  };
+
+  const addBudgetItem = () => {
+    const name = prompt("Nombre del material:");
+    if (name) {
+      setBudget([...budget, { id: crypto.randomUUID(), name, quantity: 1, price: 0 }]);
+    }
+  };
+
+  const activeRoom = rooms.find(r => r.id === activeRoomId);
+
+  return (
+    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 pb-10">
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={step === 'result' ? () => setStep('input') : onBack} className="p-3 bg-gray-100 rounded-2xl active:scale-90 transition-all">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1">
+          <input 
+            type="text" 
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            className="bg-transparent border-none focus:ring-0 text-xl font-black uppercase tracking-tighter p-0 w-full"
+          />
+          <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">
+            {step === 'input' ? 'Ingeniería de Instalaciones' : 'Cumplimiento REBT 2026'}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => {
+              if (auth.currentUser) {
+                fetchSavedDesigns();
+                setShowSavedModal(true);
+              } else {
+                saveToFirestore(); // This will trigger login
+              }
+            }}
+            className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm active:scale-90 transition-all flex items-center gap-2"
+          >
+            <FolderOpen className="w-4 h-4 text-blue-500" />
+            <span className="text-[10px] font-black uppercase hidden sm:inline">Proyectos</span>
+          </button>
+          <label className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm active:scale-90 transition-all flex items-center gap-2 cursor-pointer">
+            <FileUp className="w-4 h-4 text-green-500" />
+            <span className="text-[10px] font-black uppercase hidden sm:inline">Importar</span>
+            <input type="file" accept=".json" onChange={importFromJSON} className="hidden" />
+          </label>
+        </div>
+      </div>
+
+      {showSavedModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl max-h-[80vh] flex flex-col"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h4 className="text-xl font-black uppercase">Mis Proyectos Guardados</h4>
+              <button onClick={() => setShowSavedModal(false)} className="p-2 bg-gray-100 rounded-full"><ArrowLeft className="w-4 h-4" /></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+              {savedDesigns.length === 0 ? (
+                <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-3xl">
+                  <p className="text-[10px] font-black text-gray-300 uppercase">No tienes proyectos guardados en la nube</p>
+                </div>
+              ) : (
+                savedDesigns.map((design) => (
+                  <div key={design.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex justify-between items-center group hover:border-blue-200 transition-all">
+                    <div>
+                      <p className="font-black uppercase text-gray-900 text-xs">{design.name}</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase">
+                        {design.createdAt?.toDate ? design.createdAt.toDate().toLocaleDateString() : 'Reciente'} • {design.rooms?.length || 0} Estancias
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => loadDesign(design)}
+                        className="p-2 bg-blue-500 text-white rounded-xl font-black uppercase text-[8px] px-4"
+                      >
+                        Cargar
+                      </button>
+                      <button 
+                        onClick={() => deleteDesign(design.id)}
+                        className="p-2 bg-red-100 text-red-500 rounded-xl"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {step === 'input' ? (
+        <div className="space-y-6">
+          {/* Room Selector */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {rooms.map(room => (
+              <button 
+                key={room.id}
+                onClick={() => setActiveRoomId(room.id)}
+                className={`shrink-0 px-6 py-3 rounded-2xl font-black uppercase text-[10px] transition-all border-2 ${activeRoomId === room.id ? 'bg-gray-900 text-yellow-400 border-gray-900' : 'bg-white text-gray-400 border-gray-100'}`}
+              >
+                {room.name}
+              </button>
+            ))}
+            <button 
+              onClick={() => setShowRoomModal(true)}
+              className="shrink-0 px-4 py-3 bg-yellow-400 text-black rounded-2xl font-black uppercase text-[10px] flex items-center gap-2"
+            >
+              <PlusCircle className="w-4 h-4" /> Nueva
+            </button>
+          </div>
+
+          {/* Room Modal */}
+          {showRoomModal && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl"
+              >
+                <h4 className="text-xl font-black uppercase mb-6">Nueva Estancia</h4>
+                <input 
+                  autoFocus
+                  type="text" 
+                  value={newRoomName}
+                  onChange={(e) => setNewRoomName(e.target.value)}
+                  placeholder="Ej: Terraza, Garaje..."
+                  className="w-full p-4 bg-gray-100 rounded-2xl border-none focus:ring-2 focus:ring-yellow-400 font-bold mb-6"
+                  onKeyDown={(e) => e.key === 'Enter' && addRoom()}
+                />
+                <div className="flex gap-3">
+                  <button onClick={() => setShowRoomModal(false)} className="flex-1 p-4 bg-gray-100 rounded-2xl font-black uppercase text-[10px]">Cancelar</button>
+                  <button onClick={addRoom} className="flex-1 p-4 bg-yellow-400 rounded-2xl font-black uppercase text-[10px]">Añadir</button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {activeRoom ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h4 className="font-black uppercase text-gray-900">{activeRoom.name}</h4>
+                <button onClick={() => removeRoom(activeRoom.id)} className="text-red-500 p-2"><Trash2 className="w-4 h-4" /></button>
+              </div>
+
+              <div className="space-y-3 mb-8">
+                {activeRoom.appliances.map(app => (
+                  <div key={app.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white rounded-xl shadow-sm">
+                        {app.type === 'lighting' ? <Zap className="w-3 h-3 text-yellow-500" /> : <Smartphone className="w-3 h-3 text-blue-500" />}
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-gray-700">{app.name}</span>
+                    </div>
+                    <button onClick={() => removeAppliance(activeRoom.id, app.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-2">¿Qué vas a poner en esta dependencia?</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {getRecommendations(activeRoom.name).map((rec, idx) => (
+                      <button 
+                        key={idx}
+                        onClick={() => addAppliance(activeRoom.id, rec.type, rec.name)}
+                        className="p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-gray-100 transition-all flex flex-col items-center gap-2 group active:scale-95"
+                      >
+                        <div className="p-2 bg-white rounded-xl shadow-sm group-hover:scale-110 transition-transform">
+                          {rec.type === 'lighting' ? <Zap className="w-4 h-4 text-yellow-500" /> : 
+                           rec.type === 'socket' ? <Smartphone className="w-4 h-4 text-blue-500" /> :
+                           rec.type === 'oven' ? <Flame className="w-4 h-4 text-orange-500" /> :
+                           rec.type === 'ac' ? <Zap className="w-4 h-4 text-cyan-500" /> :
+                           <RefreshCw className="w-4 h-4 text-purple-500" />}
+                        </div>
+                        <span className="text-[9px] font-black uppercase text-gray-600 text-center">{rec.label}</span>
+                      </button>
+                    ))}
+                    
+                    <button 
+                      onClick={() => setShowCustomAppliance(true)}
+                      className="p-4 bg-yellow-50 rounded-2xl border border-yellow-100 hover:bg-yellow-100 transition-all flex flex-col items-center gap-2 active:scale-95"
+                    >
+                      <div className="p-2 bg-white rounded-xl shadow-sm text-yellow-600"><PlusCircle className="w-4 h-4" /></div>
+                      <span className="text-[9px] font-black uppercase text-yellow-700">Otro equipo</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Appliance Modal */}
+              {showCustomAppliance && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                  <motion.div 
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl"
+                  >
+                    <h4 className="text-xl font-black uppercase mb-2">¿Qué vas a poner?</h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mb-6">Escribe el nombre del equipo</p>
+                    <input 
+                      autoFocus
+                      type="text" 
+                      value={customAppName}
+                      onChange={(e) => setCustomAppName(e.target.value)}
+                      placeholder="Ej: Televisión, Secadora, Nevera..."
+                      className="w-full p-4 bg-gray-100 rounded-2xl border-none focus:ring-2 focus:ring-yellow-400 font-bold mb-6"
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddCustomAppliance()}
+                    />
+                    <div className="flex gap-3">
+                      <button onClick={() => setShowCustomAppliance(false)} className="flex-1 p-4 bg-gray-100 rounded-2xl font-black uppercase text-[10px]">Cancelar</button>
+                      <button onClick={handleAddCustomAppliance} className="flex-1 p-4 bg-yellow-400 rounded-2xl font-black uppercase text-[10px]">Añadir</button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <div className="py-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Selecciona una estancia</p>
+            </div>
+          )}
+
+          <button 
+            onClick={generateDesign}
+            className="w-full p-6 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all"
+          >
+            <RefreshCw className="w-5 h-5" /> Generar Esquema Técnico
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-8" ref={reportRef}>
+          {/* Single-line Diagram (Unifilar) */}
+          <section className="space-y-4">
+            <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-2">Esquema Unifilar Técnico</h4>
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-100 overflow-x-auto">
+              <div className="min-w-[800px] p-4">
+                <svg width="100%" height="300" viewBox="0 0 800 300" className="overflow-visible">
+                  {/* Main Bus */}
+                  <line x1="0" y1="50" x2="800" y2="50" stroke="#111" strokeWidth="2" />
+                  <text x="10" y="40" className="text-[10px] font-black uppercase fill-gray-400">Acometida 10mm²</text>
+                  
+                  {/* IGA */}
+                  <rect x="40" y="30" width="40" height="40" fill="#111" rx="4" />
+                  <text x="60" y="55" textAnchor="middle" className="fill-white text-[8px] font-black">IGA</text>
+                  <text x="60" y="85" textAnchor="middle" className="fill-gray-900 text-[10px] font-black">40A</text>
+                  
+                  {/* PCS */}
+                  <rect x="100" y="30" width="40" height="40" fill="#333" rx="4" />
+                  <text x="120" y="55" textAnchor="middle" className="fill-white text-[8px] font-black">PCS</text>
+                  <text x="120" y="85" textAnchor="middle" className="fill-gray-900 text-[10px] font-black">OVR</text>
+
+                  {/* Differentials and Circuits */}
+                  {[...new Set(circuits.map(c => c.idGroup))].map((groupId, gIdx) => {
+                    const groupCircuits = circuits.filter(c => c.idGroup === groupId);
+                    const startX = 180 + (gIdx * 300); // Increased spacing between groups
+                    
+                    return (
+                      <g key={groupId}>
+                        {/* Connection from main bus */}
+                        <line x1={startX + 20} y1="50" x2={startX + 20} y2="100" stroke="#111" strokeWidth="2" />
+                        
+                        {/* ID */}
+                        <rect x={startX} y="100" width="40" height="50" fill="#2563eb" rx="4" />
+                        <text x={startX + 20} y="130" textAnchor="middle" className="fill-white text-[8px] font-black">ID {groupId}</text>
+                        <text x={startX + 20} y="165" textAnchor="middle" className="fill-blue-600 text-[9px] font-black">40A/30mA</text>
+
+                        {/* PIAs */}
+                        {groupCircuits.map((c, cIdx) => {
+                          const piaX = startX - 70 + (cIdx * 60); // Increased spacing between PIAs
+                          return (
+                            <g key={c.id}>
+                              {/* Orthogonal lines instead of diagonals */}
+                              <path 
+                                d={`M ${startX + 20} 150 L ${startX + 20} 165 L ${piaX + 15} 165 L ${piaX + 15} 180`} 
+                                fill="none" 
+                                stroke="#94a3b8" 
+                                strokeWidth="1.5" 
+                              />
+                              <rect x={piaX} y="180" width="30" height="40" fill="#111" rx="4" />
+                              <text x={piaX + 15} y="205" textAnchor="middle" className="fill-yellow-400 text-[8px] font-black">{c.code}</text>
+                              <text x={piaX + 15} y="235" textAnchor="middle" className="fill-gray-900 text-[9px] font-black">{c.amps}A</text>
+                              <text x={piaX + 15} y="250" textAnchor="middle" className="fill-blue-600 text-[7px] font-black">{c.cable}</text>
+                              <text x={piaX + 15} y="265" textAnchor="middle" className="fill-gray-400 text-[6px] font-bold uppercase">{c.label}</text>
+                            </g>
+                          );
+                        })}
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            </div>
+          </section>
+
+          {/* Physical Layout */}
+          <section className="space-y-4">
+            <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-2">Montaje en Carril DIN</h4>
+            <div className="bg-gray-200 rounded-[3rem] p-10 border-8 border-gray-300 shadow-2xl relative">
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[8px] font-black text-gray-400 uppercase">Cuadro de Distribución Principal</div>
+              
+              <div className="bg-gray-300 h-4 w-full absolute top-1/2 -translate-y-1/2 left-0 shadow-inner" />
+              
+              <div className="relative flex gap-1 items-end overflow-x-auto pb-4 scrollbar-hide">
+                <DINModule type="IGA" label="General" amps={40} color="bg-gray-800 text-white" width="w-20" />
+                <DINModule type="PCS" label="Sobretensiones" color="bg-gray-700 text-white" width="w-20" />
+                
+                <div className="w-4 shrink-0" /> {/* Spacer */}
+
+                {[...new Set(circuits.map(c => c.idGroup))].map(groupId => (
+                  <React.Fragment key={groupId}>
+                    <DINModule type="ID" label={`Diferencial ${groupId}`} amps={40} color="bg-blue-700 text-white" width="w-24" />
+                    {circuits.filter(c => c.idGroup === groupId).map(c => (
+                      <DINModule key={c.id} type="PIA" label={c.label} amps={c.amps} color="bg-gray-100" width="w-14" />
+                    ))}
+                    <div className="w-4 shrink-0" /> {/* Spacer */}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Technical Specs */}
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+              <h5 className="text-[10px] font-black uppercase text-gray-400 mb-4">Resumen de Cargas</h5>
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px] font-bold">
+                  <span>Potencia Estimada:</span>
+                  <span className="text-gray-900">{(circuits.reduce((acc, c) => acc + (c.amps * 230), 0) * 0.4 / 1000).toFixed(2)} kW (Simult.)</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-bold">
+                  <span>Circuitos Totales:</span>
+                  <span className="text-gray-900">{circuits.length}</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-bold">
+                  <span>Diferenciales:</span>
+                  <span className="text-gray-900">{[...new Set(circuits.map(c => c.idGroup))].length}</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-yellow-50 p-6 rounded-[2rem] border border-yellow-100">
+              <h5 className="text-[10px] font-black uppercase text-yellow-700 mb-4">Nota Técnica</h5>
+              <p className="text-[9px] font-bold text-yellow-800 leading-relaxed uppercase">
+                Diseño generado bajo normativa REBT. Se recomienda el uso de peines de conexión para los PIAs y punteras en todos los terminales. Verifique la sección de la derivación individual.
+              </p>
+            </div>
+          </section>
+
+          {/* Budget Section */}
+          <section className="space-y-4">
+            <div className="flex justify-between items-center px-2">
+              <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Presupuesto Estimado de Materiales</h4>
+              <button 
+                onClick={addBudgetItem}
+                className="p-2 bg-yellow-400 text-black rounded-xl font-black uppercase text-[8px] flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> Añadir Material
+              </button>
+            </div>
+            <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100 overflow-hidden">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="pb-4 text-[8px] font-black uppercase text-gray-400">Descripción</th>
+                    <th className="pb-4 text-[8px] font-black uppercase text-gray-400 text-center">Cant.</th>
+                    <th className="pb-4 text-[8px] font-black uppercase text-gray-400 text-right">Precio (€)</th>
+                    <th className="pb-4 text-[8px] font-black uppercase text-gray-400 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {budget.map(item => (
+                    <tr key={item.id} className="group">
+                      <td className="py-4">
+                        <input 
+                          type="text" 
+                          value={item.name} 
+                          onChange={(e) => updateBudgetItem(item.id, 'name', e.target.value)}
+                          className="w-full bg-transparent border-none focus:ring-0 text-[10px] font-bold p-0"
+                        />
+                      </td>
+                      <td className="py-4 text-center">
+                        <input 
+                          type="number" 
+                          value={item.quantity} 
+                          onChange={(e) => updateBudgetItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                          className="w-12 bg-transparent border-none focus:ring-0 text-[10px] font-bold p-0 text-center"
+                        />
+                      </td>
+                      <td className="py-4 text-right">
+                        <input 
+                          type="number" 
+                          value={item.price} 
+                          onChange={(e) => updateBudgetItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                          className="w-20 bg-transparent border-none focus:ring-0 text-[10px] font-bold p-0 text-right"
+                        />
+                      </td>
+                      <td className="py-4 text-right">
+                        <button onClick={() => removeBudgetItem(item.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-900">
+                    <td colSpan={2} className="pt-4 text-[10px] font-black uppercase">Total Estimado (IVA no incl.)</td>
+                    <td className="pt-4 text-right text-[12px] font-black text-gray-900">
+                      {budget.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2)} €
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+
+          <div className="flex gap-4">
+            <button 
+              onClick={saveToFirestore}
+              disabled={isSaving}
+              className="flex-1 p-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {isSaving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Cloud className="w-5 h-5" />}
+              {isSaving ? 'Guardando...' : 'Guardar en la Nube'}
+            </button>
+            <button 
+              onClick={exportToJSON}
+              className="p-6 bg-white border-2 border-gray-900 rounded-[2rem] text-gray-900 font-black uppercase text-[10px] flex items-center justify-center gap-2 active:scale-95"
+            >
+              <FileDown className="w-5 h-5" /> Exportar JSON
+            </button>
+          </div>
+
+          <div className="flex gap-4">
+            <button 
+              onClick={exportToPDF}
+              disabled={isExporting}
+              className="flex-1 p-6 bg-gray-900 text-yellow-400 rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {isExporting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+              {isExporting ? 'Generando PDF...' : 'Exportar Memoria Técnica (PDF)'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ApplianceBtn: React.FC<{ icon: React.ReactNode, label: string, onClick: () => void }> = ({ icon, label, onClick }) => (
+  <button 
+    onClick={onClick}
+    className="p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-gray-100 transition-colors flex flex-col items-center gap-2"
+  >
+    <div className="text-gray-400">{icon}</div>
+    <span className="text-[9px] font-black uppercase text-gray-600">{label}</span>
+  </button>
+);
 
 export default ToolsModule;

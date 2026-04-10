@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, User, CheckCircle2, AlertCircle, AlertTriangle, Send, Trash2, X, Building, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, User, CheckCircle2, AlertCircle, AlertTriangle, Send, Trash2, X, Building, Users, Smartphone } from 'lucide-react';
 import { CalendarTask, User as UserType, UrgencyLevel, AppTab, ExternalUser, Role } from '../types';
 import { storageService } from '../services/storageService';
 import { getLocalDateString, isHoliday } from '../services/dateUtils';
@@ -234,7 +234,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigat
                     </div>
                     <div>
                       <h4 className="font-black text-[11px] uppercase text-gray-900 leading-none">{task.title}</h4>
-                      <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">{task.type} · {task.startTime || 'Todo el día'}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-[8px] font-bold text-gray-400 uppercase">{task.type} · {task.startTime || 'Todo el día'}</p>
+                        {task.whatsappNotification?.enabled && (
+                          <div className={`flex items-center gap-0.5 px-1 rounded-sm ${task.whatsappNotification.sent ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                            <Smartphone className="w-2 h-2" />
+                            <span className="text-[6px] font-black uppercase">{task.whatsappNotification.sent ? 'Enviado' : 'Programado'}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <button 

@@ -66,6 +66,21 @@
         "status": { "type": "string" }
       },
       "required": ["id", "title", "date", "status"]
+    },
+    "ElectricalDesign": {
+      "title": "Electrical Design",
+      "description": "Saved electrical panel design",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "rooms": { "type": "array" },
+        "circuits": { "type": "array" },
+        "budget": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "rooms"]
     }
   },
   "firestore": {
@@ -100,6 +115,10 @@
     "boiler_readings": { "schema": "object", "description": "Boiler readings" },
     "boiler_maintenance": { "schema": "object", "description": "Boiler maintenance" },
     "providers": { "schema": "object", "description": "Providers" },
-    "categories": { "schema": "object", "description": "Categories" }
+    "categories": { "schema": "object", "description": "Categories" },
+    "electrical_designs": {
+      "schema": "ElectricalDesign",
+      "description": "Collection of saved electrical panel designs"
+    }
   }
 }

@@ -195,6 +195,13 @@ export interface CalendarTask {
   recurrence?: 'No' | 'Diaria' | 'Semanal' | 'Mensual';
   reminder?: string[];
   checklist?: ChecklistItem[];
+  whatsappNotification?: {
+    enabled: boolean;
+    notifyAt: string; // ISO date string
+    phoneNumber?: string;
+    sent?: boolean;
+    error?: string;
+  };
   createdBy: string;
   createdAt: string;
 }

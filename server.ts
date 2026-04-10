@@ -4,6 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import admin from "firebase-admin";
 import { getFirestore } from 'firebase-admin/firestore';
+import twilio from 'twilio';
 
 // Load Firebase configuration
 const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
@@ -35,6 +36,10 @@ if (admin.apps.length === 0) {
 const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
 console.log(`Connecting to Firestore database: ${dbId}`);
 const db = getFirestore(adminApp, dbId);
+
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN 
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
 
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
@@ -441,6 +446,68 @@ async function automateSaltInventory() {
   }
 }
 
+async function checkScheduledWhatsAppNotifications() {
+  try {
+    const now = new Date().toISOString();
+    const tasksRef = db.collection('tasks');
+    
+    // Query for tasks with enabled notifications that haven't been sent and are due
+    const snapshot = await tasksRef
+      .where('whatsappNotification.enabled', '==', true)
+      .where('whatsappNotification.sent', '==', false)
+      .where('whatsappNotification.notifyAt', '<=', now)
+      .get();
+
+    if (snapshot.empty) return;
+
+    console.log(`[WHATSAPP] Found ${snapshot.size} notifications to process.`);
+
+    for (const doc of snapshot.docs) {
+      const task = doc.data();
+      const phone = task.whatsappNotification.phoneNumber;
+      
+      if (!phone) {
+        await tasksRef.doc(doc.id).update({
+          'whatsappNotification.sent': true,
+          'whatsappNotification.error': 'No phone number provided'
+        });
+        continue;
+      }
+
+      const msg = `🔔 *RECORDATORIO SIGAI USAC*\n━━━━━━━━━━━━━━\n📋 *Tarea:* ${task.title}\n📅 *Fecha:* ${task.startDate}\n⏰ *Hora:* ${task.startTime || 'S/N'}\n🏢 *Ubicación:* ${task.location || 'N/A'}\n📝 *Descripción:* ${task.description}\n━━━━━━━━━━━━━━\n_Este es un aviso automático programado._`;
+
+      if (twilioClient) {
+        try {
+          await twilioClient.messages.create({
+            body: msg,
+            from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+            to: `whatsapp:${phone.startsWith('+') ? phone : '+34' + phone}`
+          });
+          
+          await tasksRef.doc(doc.id).update({
+            'whatsappNotification.sent': true,
+            'whatsappNotification.sentAt': new Date().toISOString()
+          });
+          console.log(`[WHATSAPP] Sent to ${phone} for task: ${task.title}`);
+        } catch (err: any) {
+          console.error(`[WHATSAPP] Error sending to ${phone}:`, err.message);
+          await tasksRef.doc(doc.id).update({
+            'whatsappNotification.error': err.message
+          });
+        }
+      } else {
+        console.warn("[WHATSAPP] Twilio not configured. Marking as sent (DEV MODE).");
+        await tasksRef.doc(doc.id).update({
+          'whatsappNotification.sent': true,
+          'whatsappNotification.error': 'Twilio not configured'
+        });
+      }
+    }
+  } catch (error) {
+    console.error("[WHATSAPP] Error in check loop:", error);
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -515,6 +582,7 @@ async function startServer() {
       automateGasoilTelemetry();
       automateBoilerTelemetry();
       automateSaltInventory();
+      checkScheduledWhatsAppNotifications();
     }, 5 * 60 * 1000);
   });
 }

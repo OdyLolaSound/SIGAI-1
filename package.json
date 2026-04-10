@@ -19,7 +19,8 @@
     "express": "^5.2.1",
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
-    "jspdf": "^4.2.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.562.0",
@@ -32,6 +33,7 @@
     "tailwindcss": "^4.2.1",
     "three": "^0.183.2",
     "tsx": "^4.21.0",
+    "twilio": "^5.13.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
