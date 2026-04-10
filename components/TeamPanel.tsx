@@ -687,15 +687,30 @@ interface LeaveRequestModalProps {
 }
 
 const LEAVE_TYPES: LeaveType[] = [
-  'Vacaciones', 'Asuntos Propios', 'Descanso Obligatorio', 'Descanso Adicional', 'Maniobras',
-  'Baja Médica', 'Enfermo Domicilio', 'Permisos Varios (Hospitalización/enfermedad familiar 1º o 2º grado, Otros permisos)',
-  'Conciliación Familiar', 'Comisión de Servicio', 'Ejercicios Varios', 'Servicio de Guardia',
-  'Jornada de Instrucción Prolongada', 'Jornada de Instrucción Continuada', 'Curso', 'Flexibilidad Horaria',
-  'Reducción de Jornada', 'Otro'
+  'VA - VACACIONES',
+  'AP - ASUNTOS PROPIOS',
+  'DO - DESCANSO OBLIGATORIO',
+  'DA - DESCANSO ADICIONAL',
+  'MA - MANIOBRAS',
+  'BM - BAJA MÉDICA',
+  'AZ - ENFERMO DOMICILIO',
+  'PV - PERMISOS VARIOS',
+  'VA - VACACIONES (AÑO ANTERIOR)',
+  'AP - ASUNTOS PROPIOS (AÑO ANTERIOR)',
+  'CON - CONCILIACIÓN FAMILIAR',
+  'CS - COMISIÓN DE SERVICIO',
+  'CS - EJERCICIOS VARIOS',
+  'SG - SERVICIO DE GUARDIA',
+  'JIP - JORNADA DE INSTRUCCIÓN PROLONGADA',
+  'JIC - JORNADA DE INSTRUCCIÓN CONTINUA',
+  'CU - CURSO',
+  'FH - FLEXIBILIDAD HORARIA',
+  'RJ - REDUCCIÓN DE JORNADA',
+  'Otro'
 ];
 
 const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ tech, onClose, onSuccess }) => {
-  const [type, setType] = useState<LeaveType>('Vacaciones');
+  const [type, setType] = useState<LeaveType>('VA - VACACIONES');
   const [startDate, setStartDate] = useState(getLocalDateString());
   const [endDate, setEndDate] = useState(getLocalDateString());
   const [notes, setNotes] = useState('');

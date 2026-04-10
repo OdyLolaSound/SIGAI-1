@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserCheck, ShieldCheck, Building2, UserX, Check, Lock, RefreshCcw, Crown, CheckCircle2, Phone, Mail, Edit2, Save, XCircle, Trash2, Circle } from 'lucide-react';
-import { User, Building, Role } from '../types';
+import { User, Building, Role, UserCategory } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
 import { db } from '../firebase';
 import { collection, onSnapshot, query } from 'firebase/firestore';
@@ -18,6 +18,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
   const [editForm, setEditForm] = useState({ name: '', phone: '', username: '' });
   const [tempBuildings, setTempBuildings] = useState<string[]>([]);
   const [tempUnits, setTempUnits] = useState<Role[]>([]);
+  const [tempCategory, setTempCategory] = useState<UserCategory | undefined>(undefined);
   const isMaster = currentUser.role === 'MASTER';
 
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -50,10 +51,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     const user = users.find(u => u.id === userId);
     setTempBuildings(user?.assignedBuildings || []);
     setTempUnits(user?.assignedUnits || []);
+    setTempCategory(user?.userCategory);
   };
 
   const saveApproval = (userId: string) => {
-    storageService.updateUserStatus(userId, 'approved', tempBuildings, tempUnits);
+    storageService.updateUserStatus(userId, 'approved', tempBuildings, tempUnits, tempCategory);
     setUsers(storageService.getUsers());
     setEditingUserId(null);
   };
@@ -266,6 +268,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                         </button>
                       </div>
                       
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Categoría de Usuario (Permisos):</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['Oficina de Control', 'Técnico'] as UserCategory[]).map(cat => (
+                            <button 
+                              key={cat} 
+                              onClick={() => setTempCategory(cat)} 
+                              className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${tempCategory === cat ? 'border-tactical-emerald/50 bg-tactical-emerald/10 text-gray-900' : 'border-gray-50 bg-gray-50 text-gray-300'}`}
+                            >
+                              <Circle className={`w-3 h-3 ${tempCategory === cat ? 'fill-tactical-emerald text-tactical-emerald' : 'opacity-20'}`} />
+                              <span className="text-[10px] font-black uppercase">{cat}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <div>
                         <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-3">Unidades Autorizadas (Botones):</p>
                         <div className="grid grid-cols-2 gap-2">

@@ -77,6 +77,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
   }, [requests]);
 
   const isRestricted = !isMaster && activeUnit !== 'USAC';
+  const isTecnico = user.userCategory === 'Técnico';
   
   return (
     <div className="w-full max-w-sm mx-auto space-y-10 pb-12 animate-in fade-in duration-500">
@@ -138,7 +139,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
           <ClipboardList className="w-4 h-4 text-yellow-500" /> {isRestricted ? 'Nueva Solicitud' : 'Gestión Operativa'}
         </h3>
         <div className="grid grid-cols-1 gap-4">
-          {!isRestricted && (
+          {(!isRestricted || isTecnico) && (
             <ActionButton 
               icon={<Calendar className="w-6 h-6" />}
               title="Mi Agenda"
@@ -149,7 +150,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
             />
           )}
           
-          <div className={`grid ${isRestricted ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
+          <div className={`grid ${(isRestricted && !isTecnico) ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
             <ActionButton 
               icon={<MessageSquare className="w-5 h-5" />}
               title="Abrir Parte"
@@ -170,7 +171,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
         </div>
       </section>
 
-      {!isRestricted && (
+      {!isRestricted && !isTecnico && (
         <>
           {/* SECCIÓN 2: CONSUMOS Y SUMINISTROS */}
           <section className="space-y-4 px-2">

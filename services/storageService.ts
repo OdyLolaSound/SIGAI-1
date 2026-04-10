@@ -1,5 +1,5 @@
 
-import { Reading, Building, ServiceType, Role, User, UserStatus, RequestItem, GasoilTank, Boiler, BoilerTemperatureReading, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, SaltWarehouse, SaltSoftener, CalendarTask, AppNotification, GasoilReading, RefuelRequest, SaltRefillLog, SaltEntryLog, ExternalUser, WaterAccount, WaterSyncLog, GasoilAlertStatus, Provider, MaterialCategory, MaterialItem, LeaveEntry } from '../types';
+import { Reading, Building, ServiceType, Role, User, UserStatus, UserCategory, RequestItem, GasoilTank, Boiler, BoilerTemperatureReading, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, SaltWarehouse, SaltSoftener, CalendarTask, AppNotification, GasoilReading, RefuelRequest, SaltRefillLog, SaltEntryLog, ExternalUser, WaterAccount, WaterSyncLog, GasoilAlertStatus, Provider, MaterialCategory, MaterialItem, LeaveEntry } from '../types';
 import { getLocalDateString, isWorkDay, isWeekend } from './dateUtils';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, setDoc, getDocs, onSnapshot, query, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
@@ -258,9 +258,9 @@ export const storageService = {
       handleFirestoreError(e, OperationType.UPDATE, 'users');
     }
   },
-  updateUserStatus: async (userId: string, status: UserStatus, assignedBuildings: string[], assignedUnits: Role[]) => {
+  updateUserStatus: async (userId: string, status: UserStatus, assignedBuildings: string[], assignedUnits: Role[], userCategory?: UserCategory) => {
     try {
-      await updateDoc(doc(db, 'users', userId), { status, assignedBuildings, assignedUnits });
+      await updateDoc(doc(db, 'users', userId), { status, assignedBuildings, assignedUnits, userCategory });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'users');
     }

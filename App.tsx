@@ -19,6 +19,7 @@ import TemperatureModule from './components/TemperatureModule';
 import MaintenanceModule from './components/MaintenanceModule';
 import WaterSyncModule from './components/WaterSyncModule';
 import ToolsModule from './components/ToolsModule';
+import LaborCalendar from './components/LaborCalendar';
 import { AppTab, ServiceType, Building, User, Role } from './types';
 import { Zap, Droplets, Flame, ShieldCheck, ChevronRight, User as UserIcon, LogOut, Crown, PlusCircle, LayoutGrid, UserPlus, MessageSquare, Package, ClipboardList, Calendar, Users, Bell, Phone, CheckCircle, Info } from 'lucide-react';
 import { storageService, BUILDINGS } from './services/storageService';
@@ -514,46 +515,13 @@ const App: React.FC = () => {
            </div>
          </div>
 
-         {/* Gestión de Permisos (Solo para Técnicos Manto y USAC) */}
-         {(currentUser.isManto || currentUser.role === 'USAC' || isMaster) && (
+          {/* Gestión de Permisos (Solo para Técnicos Manto y USAC) */}
+          {(currentUser.isManto || currentUser.role === 'USAC' || isMaster) && (
             <div className="space-y-6">
               <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 px-2 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-red-500" /> Calendario Laboral / Permisos
               </h3>
-              <div className="bg-white border border-gray-100 rounded-[3rem] p-8 shadow-sm space-y-4">
-                <p className="text-[9px] text-gray-400 font-bold uppercase leading-relaxed">
-                  Marca los días en los que no estarás disponible para el servicio (Permisos, Bajas, Vacaciones).
-                </p>
-                <div className="grid grid-cols-1 gap-2">
-                  <input 
-                    type="date" 
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 font-bold text-xs"
-                    onChange={(e) => {
-                      const date = e.target.value;
-                      if (!date) return;
-                      const currentLeave = currentUser.leaveDays || [];
-                      if (currentLeave.includes(date)) return;
-                      const updated = [...currentLeave, date];
-                      storageService.updateUserLeaveDays(currentUser.id, updated);
-                      setCurrentUser({...currentUser, leaveDays: updated});
-                    }}
-                  />
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(currentUser.leaveDays || []).sort().map(date => (
-                      <div key={date} className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-xl text-[9px] font-black uppercase">
-                        {date}
-                        <button onClick={() => {
-                          const updated = (currentUser.leaveDays || []).filter(d => d !== date);
-                          storageService.updateUserLeaveDays(currentUser.id, updated);
-                          setCurrentUser({...currentUser, leaveDays: updated});
-                        }}>
-                          <PlusCircle className="w-3 h-3 rotate-45" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <LaborCalendar user={currentUser} onUpdate={(updated) => setCurrentUser(updated)} />
             </div>
           )}
 
