@@ -368,6 +368,15 @@ export interface RequestItem {
   neededDate?: string;
   methodSent?: 'email' | 'whatsapp' | 'save';
   registrationNumber?: string;
+  locationData?: {
+    buildingId?: string;
+    buildingName?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+    specificLocation?: string;
+  };
 }
 
 export interface MaterialItem {

@@ -5,14 +5,14 @@ import {
   RefreshCw, Maximize, Save, Trash2, 
   Layers, Move, RotateCcw, Info,
   ChevronRight, Calculator, Scaling, FileSpreadsheet, PlusCircle,
-  FileCode, Home, CheckCircle
+  FileCode, Home, CheckCircle, Target, Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import * as THREE from 'three';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 
-type ToolType = 'menu' | 'converter' | 'ar_measure' | 'scan_3d';
+type ToolType = 'menu' | 'converter' | 'ar_measure' | 'scan_3d' | 'level';
 
 interface Point3D {
   x: number;
@@ -31,6 +31,8 @@ const ToolsModule: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         return <ARMeasureTool onBack={() => setActiveTool('menu')} />;
       case 'scan_3d':
         return <Scan3DTool onBack={() => setActiveTool('menu')} />;
+      case 'level':
+        return <LevelTool onBack={() => setActiveTool('menu')} />;
       default:
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -63,6 +65,13 @@ const ToolsModule: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 desc="Modelado de habitaciones (Pro)"
                 onClick={() => setActiveTool('scan_3d')}
                 color="bg-amber-50 border-amber-100 text-amber-900"
+              />
+              <ToolCard 
+                icon={<Target className="w-6 h-6" />}
+                title="Nivel de Burbuja"
+                desc="Nivelación de superficies"
+                onClick={() => setActiveTool('level')}
+                color="bg-green-50 border-green-100 text-green-900"
               />
             </div>
 
@@ -241,12 +250,15 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       // Mark start point
       setPoints([{ x: window.innerWidth / 2, y: window.innerHeight / 2, angle: currentAngle }]);
       setDistance(0);
+      // Visual feedback
+      if (navigator.vibrate) navigator.vibrate(50);
     } else if (points.length === 1) {
       // Mark end point
       const endPoint = { x: window.innerWidth / 2, y: window.innerHeight / 2, angle: currentAngle };
       const finalDist = calculateDistance(points[0].angle, endPoint.angle);
       setPoints([...points, endPoint]);
       setDistance(finalDist);
+      if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
     } else {
       // Reset
       setPoints([]);
@@ -303,17 +315,48 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         ctx.lineTo(targetX, targetY);
         
         if (isFinished) {
-          ctx.setLineDash([]); // Solid line when finished
-          ctx.strokeStyle = '#fbbf24'; // Yellow-400 for better visibility
-          ctx.lineWidth = 5;
+          ctx.setLineDash([]); 
+          ctx.strokeStyle = '#fbbf24'; // Yellow-400 for finished
+          ctx.lineWidth = 6;
         } else {
-          ctx.setLineDash([5, 5]); // Dashed while measuring
-          ctx.strokeStyle = 'white';
-          ctx.lineWidth = 3;
+          ctx.setLineDash([]); // Solid line as requested
+          ctx.strokeStyle = '#ef4444'; // Red-500 while measuring
+          ctx.lineWidth = 4;
         }
         
         ctx.stroke();
-        ctx.setLineDash([]);
+
+        // Dibujar etiqueta de distancia sobre la línea
+        if (distance !== null) {
+          const midX = (start.x + targetX) / 2;
+          const midY = (start.y + targetY) / 2;
+          
+          ctx.save();
+          ctx.translate(midX, midY);
+          
+          // Fondo de la etiqueta (Pill shape)
+          const labelText = `${distance.toFixed(2)} m`;
+          ctx.font = 'bold 14px Inter, sans-serif';
+          const textWidth = ctx.measureText(labelText).width;
+          const padding = 12;
+          
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(-(textWidth/2 + padding), -15, textWidth + padding * 2, 30, 15);
+          } else {
+            ctx.rect(-(textWidth/2 + padding), -15, textWidth + padding * 2, 30);
+          }
+          ctx.fillStyle = isFinished ? '#fbbf24' : '#ef4444';
+          ctx.fill();
+          
+          // Texto
+          ctx.fillStyle = isFinished ? 'black' : 'white';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(labelText, 0, 0);
+          
+          ctx.restore();
+        }
 
         // Si estamos midiendo, actualizar distancia en tiempo real
         if (points.length === 1) {
@@ -396,32 +439,43 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <button onClick={onBack} className="p-4 bg-black/40 backdrop-blur-md rounded-2xl text-white">
               <ArrowLeft />
             </button>
-            <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest">
-              AR Distance Meter
+            <div className="flex flex-col items-end gap-2">
+              <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest">
+                {points.length === 0 ? 'Busca el punto de inicio' : 
+                 points.length === 1 ? 'Mueve el móvil al punto final' : 
+                 'Medición completada'}
+              </div>
+              {/* Level Indicator */}
+              <div className="flex gap-1">
+                <div className={`w-2 h-2 rounded-full ${Math.abs(currentAngle.beta) < 2 ? 'bg-green-500' : 'bg-white/20'}`} />
+                <div className={`w-2 h-2 rounded-full ${Math.abs(currentAngle.gamma) < 2 ? 'bg-green-500' : 'bg-white/20'}`} />
+              </div>
             </div>
           </div>
 
           {/* Crosshair */}
           {points.length < 2 && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center pointer-events-none">
-              <div className="w-full h-[2px] bg-white/30 absolute" />
-              <div className="h-full w-[2px] bg-white/30 absolute" />
-              <div className="w-2 h-2 bg-yellow-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.8)]" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 flex items-center justify-center pointer-events-none">
+              <div className="w-full h-[1px] bg-white/40 absolute" />
+              <div className="h-full w-[1px] bg-white/40 absolute" />
+              <div className="w-8 h-8 border border-white/20 rounded-full absolute" />
+              <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full shadow-[0_0_15px_rgba(251,191,36,1)]" />
             </div>
           )}
 
           <div className="space-y-6 pointer-events-auto">
-            {distance !== null && (
+            {/* Panel de Distancia Flotante (Opcional, ya que ahora está en la línea) */}
+            {distance !== null && points.length === 2 && (
               <motion.div 
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="bg-white/90 backdrop-blur-md rounded-3xl p-6 shadow-2xl text-center border border-white"
+                className="bg-gray-900/90 backdrop-blur-md rounded-[2rem] p-4 shadow-2xl text-center border border-white/10"
               >
-                <div className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">
-                  {points.length === 1 ? 'Midiendo...' : 'Distancia Final'}
+                <div className="text-[8px] font-black uppercase text-gray-400 tracking-[0.2em] mb-1">
+                  Medición Guardada
                 </div>
-                <div className="text-5xl font-black text-gray-900">
-                  {distance.toFixed(2)} <span className="text-sm">m</span>
+                <div className="text-3xl font-black text-white">
+                  {distance.toFixed(2)} <span className="text-xs text-yellow-400">m</span>
                 </div>
               </motion.div>
             )}
@@ -436,7 +490,7 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             >
               {points.length === 0 && <><PlusCircle className="w-6 h-6" /> Marcar Inicio</>}
               {points.length === 1 && <><CheckCircle className="w-6 h-6" /> Fijar Punto Final</>}
-              {points.length === 2 && <><RefreshCw className="w-6 h-6" /> Nueva Medida</>}
+              {points.length === 2 && <><RefreshCw className="w-6 h-6" /> Nueva Medición</>}
             </button>
           </div>
         </div>
@@ -873,6 +927,154 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// --- NIVEL DE BURBUJA ---
+const LevelTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const [orientation, setOrientation] = useState({ beta: 0, gamma: 0 });
+  const [isLevel, setIsLevel] = useState(false);
+
+  useEffect(() => {
+    let lastUpdate = Date.now();
+    const smoothingFactor = 0.15; // Adjust for more/less smoothing
+
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      const now = Date.now();
+      if (now - lastUpdate < 16) return; // Limit updates to ~60fps
+      lastUpdate = now;
+
+      const targetBeta = event.beta || 0; 
+      const targetGamma = event.gamma || 0; 
+      
+      setOrientation(prev => ({
+        beta: prev.beta + (targetBeta - prev.beta) * smoothingFactor,
+        gamma: prev.gamma + (targetGamma - prev.gamma) * smoothingFactor
+      }));
+      
+      // Check for leveling using the smoothed values for better stability
+      const isFlat = Math.abs(orientation.beta) < 1.2 && Math.abs(orientation.gamma) < 1.2;
+      const isVerticalPortrait = Math.abs(orientation.gamma) < 1.2 && (Math.abs(orientation.beta) > 88.8 && Math.abs(orientation.beta) < 91.2);
+      const isVerticalLandscape = Math.abs(orientation.beta) < 1.2 && (Math.abs(orientation.gamma) > 88.8 && Math.abs(orientation.gamma) < 91.2);
+
+      const currentlyLevel = isFlat || isVerticalPortrait || isVerticalLandscape;
+
+      if (currentlyLevel) {
+        if (!isLevel) {
+          setIsLevel(true);
+          if (navigator.vibrate) navigator.vibrate(80);
+        }
+      } else {
+        setIsLevel(false);
+      }
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation);
+    return () => window.removeEventListener('deviceorientation', handleOrientation);
+  }, [isLevel]);
+
+  // Calculate bubble positions
+  const bubbleX = Math.max(-100, Math.min(100, orientation.gamma * 5));
+  const bubbleY = Math.max(-100, Math.min(100, orientation.beta * 5));
+  
+  // Linear vials positions (clamped to -100 to 100 range for the UI)
+  const linearHX = Math.max(-80, Math.min(80, orientation.gamma * 2));
+  const linearVY = Math.max(-80, Math.min(80, (orientation.beta - 90) * 2));
+
+  return (
+    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 pb-10">
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={onBack} className="p-3 bg-gray-100 rounded-2xl active:scale-90 transition-all">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h3 className="text-xl font-black uppercase tracking-tighter">Nivel Multi-Eje</h3>
+          <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Precisión USAC 360°</p>
+        </div>
+      </div>
+
+      <div className="bg-gray-900 rounded-[3rem] p-8 shadow-2xl border border-gray-800 relative overflow-hidden flex flex-col items-center">
+        {/* Background Grid */}
+        <div className="absolute inset-0 opacity-10 pointer-events-none" 
+             style={{ backgroundImage: 'radial-gradient(circle, #4ade80 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+        
+        {/* Horizontal Vial (Top) */}
+        <div className="w-48 h-8 bg-gray-800 rounded-full border border-gray-700 mb-8 relative flex items-center justify-center overflow-hidden">
+          <div className="absolute inset-y-0 w-[1px] bg-gray-600 left-1/2" />
+          <div className="absolute inset-y-0 w-10 border-x border-gray-600 left-1/2 -translate-x-1/2" />
+          <motion.div 
+            animate={{ x: linearHX }}
+            transition={{ type: 'spring', damping: 40, stiffness: 80 }}
+            className={`w-6 h-6 rounded-full shadow-lg ${Math.abs(orientation.gamma) < 1.2 ? 'bg-green-400' : 'bg-yellow-400'}`}
+          />
+        </div>
+
+        <div className="flex items-center gap-8">
+          {/* Main Bullseye Level */}
+          <div className="relative flex flex-col items-center justify-center">
+            <div className="w-48 h-48 rounded-full border-4 border-gray-800 flex items-center justify-center relative">
+              <div className="absolute w-full h-[1px] bg-gray-800" />
+              <div className="absolute h-full w-[1px] bg-gray-800" />
+              <div className="absolute w-24 h-24 rounded-full border-2 border-gray-800" />
+              <div className="absolute w-8 h-8 rounded-full border-2 border-gray-800" />
+
+              <motion.div 
+                animate={{ x: bubbleX, y: bubbleY }}
+                transition={{ type: 'spring', damping: 40, stiffness: 80 }}
+                className={`w-8 h-8 rounded-full shadow-2xl flex items-center justify-center transition-colors duration-300 ${isLevel ? 'bg-green-400' : 'bg-yellow-400'}`}
+              >
+                <div className="w-2 h-2 bg-white/40 rounded-full blur-[1px] -mt-1 -ml-1" />
+              </motion.div>
+            </div>
+          </div>
+
+          {/* Vertical Vial (Side) */}
+          <div className="w-8 h-48 bg-gray-800 rounded-full border border-gray-700 relative flex flex-col items-center justify-center overflow-hidden">
+            <div className="absolute inset-x-0 h-[1px] bg-gray-600 top-1/2" />
+            <div className="absolute inset-x-0 h-10 border-y border-gray-600 top-1/2 -translate-y-1/2" />
+            <motion.div 
+              animate={{ y: linearVY }}
+              transition={{ type: 'spring', damping: 40, stiffness: 80 }}
+              className={`w-6 h-6 rounded-full shadow-lg ${Math.abs(orientation.beta - 90) < 1.2 ? 'bg-green-400' : 'bg-yellow-400'}`}
+            />
+          </div>
+        </div>
+
+        {/* Digital Readout */}
+        <div className="mt-10 grid grid-cols-2 gap-8 w-full">
+          <div className="text-center">
+            <div className="text-[8px] font-black text-gray-500 uppercase tracking-[0.2em] mb-1">Inclinación (X)</div>
+            <div className={`text-2xl font-black font-mono transition-colors ${Math.abs(orientation.beta) < 1 || Math.abs(Math.abs(orientation.beta) - 90) < 1 ? 'text-green-400' : 'text-white'}`}>
+              {orientation.beta.toFixed(1)}°
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-[8px] font-black text-gray-500 uppercase tracking-[0.2em] mb-1">Rotación (Y)</div>
+            <div className={`text-2xl font-black font-mono transition-colors ${Math.abs(orientation.gamma) < 1 || Math.abs(Math.abs(orientation.gamma) - 90) < 1 ? 'text-green-400' : 'text-white'}`}>
+              {orientation.gamma.toFixed(1)}°
+            </div>
+          </div>
+        </div>
+
+        {/* Status Badge */}
+        <div className="mt-8 flex justify-center">
+          <div className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.3em] border transition-all ${isLevel ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-gray-800 border-gray-700 text-gray-500'}`}>
+            {isLevel ? 'Nivel Correcto' : 'Ajustando...'}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex gap-4">
+        <Smartphone className="w-8 h-8 text-amber-500 shrink-0" />
+        <div className="space-y-1">
+          <p className="text-[9px] font-black text-amber-900 uppercase">Instrucciones de Nivelado:</p>
+          <p className="text-[8px] font-bold text-amber-800 uppercase leading-relaxed tracking-tight">
+            • <span className="text-amber-900">Plano:</span> Usa el círculo central.<br/>
+            • <span className="text-amber-900">Vertical/Horizontal:</span> Usa los tubos superior y lateral apoyando el canto del móvil.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

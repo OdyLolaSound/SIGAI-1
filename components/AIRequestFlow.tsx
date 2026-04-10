@@ -1,10 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Camera, Upload, Send, Loader2, CheckCircle2, AlertCircle, ChevronRight, X, ShieldAlert, Wrench, ArrowLeft, Bot, User as UserIcon } from 'lucide-react';
+import { MessageSquare, Camera, Upload, Send, Loader2, CheckCircle2, AlertCircle, ChevronRight, X, ShieldAlert, Wrench, ArrowLeft, Bot, User as UserIcon, MapPin, Building2, Navigation, Maximize2, Minimize2 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from 'react-markdown';
-import { User, RequestCategory, UrgencyLevel, RequestItem } from '../types';
-import { storageService } from '../services/storageService';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import { User, RequestCategory, UrgencyLevel, RequestItem, Building } from '../types';
+import { storageService, BUILDINGS } from '../services/storageService';
 
 interface AIRequestFlowProps {
   user: User;
@@ -12,7 +14,7 @@ interface AIRequestFlowProps {
   onComplete: () => void;
 }
 
-type FlowStep = 'INPUT' | 'ANALYZING' | 'AI_SUGGESTION' | 'FINAL_CONFIRM';
+type FlowStep = 'INPUT' | 'ANALYZING' | 'AI_SUGGESTION' | 'IMAGES' | 'LOCATION' | 'FINAL_CONFIRM';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -22,7 +24,7 @@ interface ChatMessage {
 const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete }) => {
   const [step, setStep] = useState<FlowStep>('INPUT');
   const [description, setDescription] = useState('');
-  const [image, setImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   
   // AI Results
@@ -40,6 +42,90 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+
+  // Location States
+  const [locationType, setLocationType] = useState<'building' | 'gps' | null>(null);
+  const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
+  const [markerPos, setMarkerPos] = useState<{ lat: number, lng: number } | null>(null);
+  const [specificLocation, setSpecificLocation] = useState('');
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+
+  // Leaflet Marker Icon Fix
+  const customIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+  });
+
+  useEffect(() => {
+    if (locationType === 'gps' && !markerPos) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const pos = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            };
+            setMarkerPos(pos);
+          },
+          (error) => {
+            console.error("Error getting location:", error);
+          }
+        );
+      }
+    }
+  }, [locationType]);
+
+  // Helper component to handle map clicks
+  const MapEvents = () => {
+    useMapEvents({
+      click(e) {
+        setMarkerPos({ lat: e.latlng.lat, lng: e.latlng.lng });
+      },
+    });
+    return null;
+  };
+
+  // Helper component to center map
+  const MapCenterer = ({ center }: { center: { lat: number, lng: number } | null }) => {
+    const map = useMap();
+    useEffect(() => {
+      if (center) {
+        map.setView([center.lat, center.lng], map.getZoom());
+      }
+    }, [center, map]);
+    return null;
+  };
+
+  // Fix for blank tiles: forces map to recalculate size after container is ready
+  const MapResizer = () => {
+    const map = useMap();
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        map.invalidateSize();
+      }, 400);
+      return () => clearTimeout(timer);
+    }, [map]);
+    return null;
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImages(prev => [...prev, reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -98,7 +184,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setImage(reader.result as string);
+      reader.onloadend = () => setImages(prev => [...prev, reader.result as string]);
       reader.readAsDataURL(file);
     }
   };
@@ -131,11 +217,11 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
         Si detectas que este problema es recurrente o "crónico" (ha pasado varias veces de forma similar), indícalo como isChronic: true y propón una solución estructural permanente en structuralSolution.` 
       }];
       
-      if (image) {
+      if (images.length > 0) {
         parts.push({
           inlineData: {
             mimeType: "image/jpeg",
-            data: image.split(',')[1]
+            data: images[0].split(',')[1]
           }
         });
       }
@@ -187,11 +273,17 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
       description: description,
       status: resolvedByAi ? 'resolved_by_ai' : 'open',
       date: new Date().toISOString(),
-      imageUrl: image || undefined,
+      imageUrl: images.length > 0 ? images[0] : undefined,
       aiExplanation: aiAnalysis?.explanation,
       aiSteps: aiAnalysis?.steps,
       isChronic: aiAnalysis?.isChronic,
-      structuralSolution: aiAnalysis?.structuralSolution
+      structuralSolution: aiAnalysis?.structuralSolution,
+      locationData: {
+        buildingId: selectedBuilding?.id,
+        buildingName: selectedBuilding?.name,
+        coordinates: markerPos || undefined,
+        specificLocation: specificLocation || undefined
+      }
     };
 
     storageService.saveRequest(newItem);
@@ -233,24 +325,6 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                   className="w-full bg-transparent text-gray-900 text-lg font-bold outline-none resize-none h-32 placeholder:text-gray-300"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => cameraInputRef.current?.click()} className="flex flex-col items-center justify-center p-6 bg-gray-50 border border-gray-100 rounded-[2rem] text-gray-900 hover:bg-gray-100 transition-all group">
-                  <Camera className="w-6 h-6 mb-2 text-yellow-600 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase">Cámara</span>
-                </button>
-                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center p-6 bg-gray-50 border border-gray-100 rounded-[2rem] text-gray-900 hover:bg-gray-100 transition-all group">
-                  <Upload className="w-6 h-6 mb-2 text-blue-600 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase">Archivo</span>
-                </button>
-              </div>
-
-              {image && (
-                <div className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-gray-100 shadow-2xl">
-                  <img src={image} className="w-full h-full object-cover" />
-                  <button onClick={() => setImage(null)} className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full"><X className="w-4 h-4" /></button>
-                </div>
-              )}
 
               <div className="space-y-3">
                 <button 
@@ -345,7 +419,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                         <CheckCircle2 className="w-4 h-4" /> Solucionado
                       </button>
                       <button 
-                        onClick={() => setStep('FINAL_CONFIRM')}
+                        onClick={() => setStep('IMAGES')}
                         className="p-5 bg-gray-100 text-gray-600 rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
                       >
                         <AlertCircle className="w-4 h-4" /> No puedo
@@ -454,7 +528,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                         <CheckCircle2 className="w-3 h-3" /> Solucionado
                       </button>
                       <button 
-                        onClick={() => setStep('FINAL_CONFIRM')}
+                        onClick={() => setStep('IMAGES')}
                         className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl font-black uppercase text-[8px] tracking-widest flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all active:scale-95"
                       >
                         <AlertCircle className="w-3 h-3" /> No puedo
@@ -470,6 +544,250 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {step === 'IMAGES' && (
+            <div className="space-y-8 animate-in slide-in-from-bottom-5 pb-10">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
+                  <Camera className="w-10 h-10" />
+                </div>
+                <h3 className="text-gray-900 text-2xl font-black uppercase tracking-tight">Evidencia Visual</h3>
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-2">Añade fotos de la avería para el equipo técnico</p>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-100 rounded-[3rem] p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="aspect-square bg-white border-2 border-gray-100 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 hover:border-yellow-400 transition-all group shadow-sm"
+                  >
+                    <div className="w-14 h-14 bg-yellow-50 text-yellow-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Camera className="w-7 h-7" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Hacer Foto</span>
+                  </button>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square bg-white border-2 border-gray-100 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 hover:border-blue-400 transition-all group shadow-sm"
+                  >
+                    <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Upload className="w-7 h-7" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Subir Archivo</span>
+                  </button>
+                </div>
+
+                {images.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Fotos seleccionadas ({images.length})</span>
+                      <button onClick={() => setImages([])} className="text-[8px] font-black text-red-500 uppercase tracking-widest">Borrar todas</button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {images.map((img, idx) => (
+                        <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative border-2 border-white shadow-md group">
+                          <img src={img} alt="Avería" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <button 
+                            onClick={() => removeImage(idx)}
+                            className="absolute top-1 right-1 bg-red-500 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <button 
+                  onClick={() => setStep('LOCATION')}
+                  className="w-full p-6 bg-yellow-400 text-black rounded-[2.5rem] font-black uppercase text-xs tracking-widest shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3"
+                >
+                  Continuar a Ubicación <ChevronRight className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => setStep('AI_SUGGESTION')}
+                  className="w-full p-2 text-gray-400 font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2"
+                >
+                  <ArrowLeft className="w-3 h-3" /> Volver al diagnóstico
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 'LOCATION' && (
+            <div className="space-y-6 animate-in slide-in-from-bottom-5 pb-10">
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 bg-yellow-50 text-yellow-600 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-yellow-100">
+                  <MapPin className="w-10 h-10" />
+                </div>
+                <h3 className="text-gray-900 text-2xl font-black uppercase tracking-tight">Ubicación de la Avería</h3>
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-2">Indica dónde se ha producido el problema</p>
+              </div>
+
+              {!locationType ? (
+                <div className="grid grid-cols-1 gap-4">
+                  <button 
+                    onClick={() => setLocationType('building')}
+                    className="p-8 bg-white border-2 border-gray-100 rounded-[2.5rem] flex items-center gap-6 hover:border-yellow-400 transition-all group"
+                  >
+                    <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Building2 className="w-8 h-8" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-gray-900 font-black uppercase text-sm tracking-tighter">Seleccionar Edificio</p>
+                      <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">Esquema de dependencias USAC</p>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setLocationType('gps')}
+                    className="p-8 bg-white border-2 border-gray-100 rounded-[2.5rem] flex items-center gap-6 hover:border-yellow-400 transition-all group"
+                  >
+                    <div className="w-16 h-16 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Navigation className="w-8 h-8" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-gray-900 font-black uppercase text-sm tracking-tighter">Ubicación GPS / Mapa</p>
+                      <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">Marcar punto exacto en el plano</p>
+                    </div>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  {locationType === 'building' ? (
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 border border-gray-100 rounded-[2rem] p-4">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-3 px-2">Selecciona el edificio:</label>
+                        <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2">
+                          {BUILDINGS.map(b => (
+                            <button
+                              key={b.id}
+                              onClick={() => setSelectedBuilding(b)}
+                              className={`p-4 rounded-2xl text-left transition-all flex items-center justify-between ${
+                                selectedBuilding?.id === b.id 
+                                  ? 'bg-yellow-400 text-black shadow-lg' 
+                                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-100'
+                              }`}
+                            >
+                              <span className="text-[11px] font-black uppercase">{b.name}</span>
+                              {selectedBuilding?.id === b.id && <CheckCircle2 className="w-4 h-4" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gray-50 border border-gray-100 rounded-[2rem] p-6">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Detalle específico (Opcional)</label>
+                        <input 
+                          type="text"
+                          value={specificLocation}
+                          onChange={(e) => setSpecificLocation(e.target.value)}
+                          placeholder="Ej: Planta 1, Baño Izquierda..."
+                          className="w-full bg-transparent text-gray-900 text-sm font-bold outline-none border-b border-gray-200 pb-2 focus:border-yellow-400 transition-colors"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`space-y-4 transition-all duration-500 ${isMapExpanded ? 'fixed inset-0 z-[2000] bg-white p-4' : ''}`}>
+                      <div className={`rounded-[2.5rem] overflow-hidden border-2 border-gray-100 relative shadow-2xl bg-gray-100 transition-all duration-500 ${isMapExpanded ? 'h-full' : 'h-[400px]'}`}>
+                        <MapContainer 
+                          key={`${locationType}-${isMapExpanded}`}
+                          center={markerPos || { lat: 38.3452, lng: -0.4815 }} 
+                          zoom={18} 
+                          style={{ height: '100%', width: '100%' }}
+                          zoomControl={false}
+                        >
+                          {/* Satellite Layer (Esri World Imagery) - Reverted as requested */}
+                          <TileLayer
+                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                            attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+                          />
+                          {/* Hybrid Labels Layer for context */}
+                          <TileLayer
+                            url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                          />
+                          <MapEvents />
+                          <MapCenterer center={markerPos} />
+                          <MapResizer />
+                          {markerPos && (
+                            <Marker position={[markerPos.lat, markerPos.lng]} icon={customIcon} />
+                          )}
+                        </MapContainer>
+
+                        {!markerPos && (
+                          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-10 text-center pointer-events-none z-[1000]">
+                            <p className="text-white font-black uppercase text-xs tracking-widest">Toca en el mapa para marcar la avería</p>
+                          </div>
+                        )}
+                        
+                        <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                          <button 
+                            onClick={() => setIsMapExpanded(!isMapExpanded)}
+                            className="bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-lg border border-gray-200 hover:bg-white transition-all active:scale-95"
+                          >
+                            {isMapExpanded ? <Minimize2 className="w-5 h-5 text-gray-700" /> : <Maximize2 className="w-5 h-5 text-gray-700" />}
+                          </button>
+                          
+                          <div className="bg-white/90 backdrop-blur-md p-2 rounded-xl shadow-lg border border-gray-200">
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center mb-1">Mapa Realista</p>
+                            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white">
+                              <Navigation className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {isMapExpanded && (
+                          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-xs px-4">
+                            <button 
+                              onClick={() => setIsMapExpanded(false)}
+                              className="w-full p-4 bg-yellow-400 text-black rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl active:scale-95 transition-all"
+                            >
+                              Confirmar Ubicación
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {!isMapExpanded && (
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                          {markerPos ? `Coordenadas: ${markerPos.lat.toFixed(5)}, ${markerPos.lng.toFixed(5)}` : 'Pendiente de marcar'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => {
+                          setLocationType(null);
+                          setSelectedBuilding(null);
+                          setMarkerPos(null);
+                        }}
+                        className="flex-1 p-5 bg-gray-100 text-gray-500 rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest active:scale-95 transition-all"
+                      >
+                        Cambiar Modo
+                      </button>
+                    <button 
+                      disabled={!selectedBuilding && !markerPos}
+                      onClick={() => setStep('FINAL_CONFIRM')}
+                      className="flex-[2] p-5 bg-yellow-400 text-black rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      Continuar a Confirmación
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <button 
+                onClick={() => setStep('IMAGES')}
+                className="w-full p-2 text-gray-400 font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-3 h-3" /> Volver a fotos
+              </button>
             </div>
           )}
 
@@ -496,6 +814,34 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                   <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Unidad</span>
                   <span className="text-gray-900 font-black uppercase text-[10px]">{user.role}</span>
                 </div>
+                {images.length > 0 && (
+                  <div className="pt-2">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-3">Imágenes Adjuntas ({images.length})</span>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                      {images.map((img, idx) => (
+                        <div key={idx} className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border-2 border-white shadow-sm">
+                          <img src={img} alt="Adjunto" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-between items-start border-b border-gray-200 pb-4">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Ubicación</span>
+                  <div className="text-right">
+                    <p className="text-gray-900 font-black uppercase text-[10px]">
+                      {selectedBuilding ? selectedBuilding.name : markerPos ? 'Marcado en Mapa' : 'No especificada'}
+                    </p>
+                    {specificLocation && (
+                      <p className="text-gray-400 text-[8px] font-bold uppercase mt-1">{specificLocation}</p>
+                    )}
+                    {markerPos && (
+                      <p className="text-gray-400 text-[8px] font-bold uppercase mt-1">
+                        {markerPos.lat.toFixed(4)}, {markerPos.lng.toFixed(4)}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -506,10 +852,10 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                   Confirmar y Enviar Parte
                 </button>
                 <button 
-                  onClick={() => setStep('AI_SUGGESTION')}
+                  onClick={() => setStep('LOCATION')}
                   className="w-full p-4 text-gray-400 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
                 >
-                  <ArrowLeft className="w-4 h-4" /> Volver atrás
+                  <ArrowLeft className="w-4 h-4" /> Corregir Ubicación
                 </button>
               </div>
             </div>
