@@ -181,9 +181,36 @@ const PDFScannerTool: React.FC<PDFScannerToolProps> = ({ onBack }) => {
     pdf.save('escaneado_usac.pdf');
   };
 
-  const shareWhatsApp = () => {
-    const text = "Hola, te envío un documento escaneado desde SIGAI USAC.";
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  const shareWhatsApp = async () => {
+    if (!processedImage) return;
+    
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgProps = pdf.getImageProperties(processedImage);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    pdf.addImage(processedImage, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+    const pdfOutput = pdf.output('arraybuffer');
+    
+    const file = new File([pdfOutput], 'escaneado_usac.pdf', { type: 'application/pdf' });
+    
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Documento Escaneado',
+          text: 'Hola, te envío un documento escaneado desde SIGAI USAC.',
+        });
+      } catch (err) {
+        console.error('Error sharing:', err);
+        // Fallback to text only if sharing fails
+        const text = "Hola, te envío un documento escaneado desde SIGAI USAC.";
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      }
+    } else {
+      const text = "Hola, te envío un documento escaneado desde SIGAI USAC. (El archivo debe adjuntarse manualmente después de descargarlo)";
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      downloadPDF();
+    }
   };
 
   const shareEmail = () => {

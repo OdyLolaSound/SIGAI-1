@@ -124,49 +124,49 @@ const PDFSignerTool: React.FC<PDFSignerToolProps> = ({ onBack }) => {
       const visualWidth = canvasElement.clientWidth;
       const visualHeight = canvasElement.clientHeight;
       
-      let pdfX, pdfY, pdfW, pdfH, rotateAngle;
+      // Escala de píxeles visuales a puntos PDF
+      // Si la rotación es 90 o 270, el ancho visual corresponde al alto del PDF y viceversa
+      const isRotated = rotation === 90 || rotation === 270;
+      const scaleX = (isRotated ? pdfHeight : pdfWidth) / visualWidth;
+      const scaleY = (isRotated ? pdfWidth : pdfHeight) / visualHeight;
 
-      // Calcular proporciones y coordenadas basadas en la rotación de la página
+      // Convertir sigPos (porcentajes) a coordenadas en píxeles visuales
+      const visualX = (sigPos.x / 100) * visualWidth;
+      const visualY = (sigPos.y / 100) * visualHeight;
+      const visualW = sigPos.width;
+      const visualH = sigPos.height;
+
+      let x, y, width, height;
+
       if (rotation === 90) {
-        const ratioX = pdfHeight / visualWidth;
-        const ratioY = pdfWidth / visualHeight;
-        pdfX = (sigPos.y / 100) * pdfWidth;
-        pdfY = pdfHeight - ((sigPos.x / 100) * pdfHeight) - (sigPos.width * ratioX);
-        pdfW = sigPos.height * ratioY;
-        pdfH = sigPos.width * ratioX;
-        rotateAngle = -90;
+        x = visualY * scaleY;
+        y = visualX * scaleX;
+        width = visualH * scaleY;
+        height = visualW * scaleX;
       } else if (rotation === 180) {
-        const ratioX = pdfWidth / visualWidth;
-        const ratioY = pdfHeight / visualHeight;
-        pdfX = pdfWidth - ((sigPos.x / 100) * pdfWidth) - (sigPos.width * ratioX);
-        pdfY = (sigPos.y / 100) * pdfHeight;
-        pdfW = sigPos.width * ratioX;
-        pdfH = sigPos.height * ratioY;
-        rotateAngle = 180;
+        x = pdfWidth - (visualX * scaleX) - (visualW * scaleX);
+        y = visualY * scaleY;
+        width = visualW * scaleX;
+        height = visualH * scaleY;
       } else if (rotation === 270) {
-        const ratioX = pdfHeight / visualWidth;
-        const ratioY = pdfWidth / visualHeight;
-        pdfX = pdfWidth - ((sigPos.y / 100) * pdfWidth) - (sigPos.height * ratioY);
-        pdfY = (sigPos.x / 100) * pdfHeight;
-        pdfW = sigPos.height * ratioY;
-        pdfH = sigPos.width * ratioX;
-        rotateAngle = 90;
+        x = pdfWidth - (visualY * scaleY) - (visualH * scaleY);
+        y = pdfHeight - (visualX * scaleX) - (visualW * scaleX);
+        width = visualH * scaleY;
+        height = visualW * scaleX;
       } else {
-        const ratioX = pdfWidth / visualWidth;
-        const ratioY = pdfHeight / visualHeight;
-        pdfX = (sigPos.x / 100) * pdfWidth;
-        pdfY = pdfHeight - ((sigPos.y / 100) * pdfHeight) - (sigPos.height * ratioY);
-        pdfW = sigPos.width * ratioX;
-        pdfH = sigPos.height * ratioY;
-        rotateAngle = 0;
+        // rotation === 0
+        x = visualX * scaleX;
+        y = pdfHeight - (visualY * scaleY) - (visualH * scaleY);
+        width = visualW * scaleX;
+        height = visualH * scaleY;
       }
       
       targetPage.drawImage(signatureImg, {
-        x: pdfX,
-        y: pdfY,
-        width: pdfW,
-        height: pdfH,
-        rotate: degrees(rotateAngle),
+        x,
+        y,
+        width,
+        height,
+        rotate: degrees(-rotation),
       });
       
       const pdfBytes = await pdfDoc.save();

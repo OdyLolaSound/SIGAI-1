@@ -4,6 +4,8 @@ import { Users, Calendar, CheckCircle, XCircle, ChevronRight, Phone, Mail, Award
 import { User, LeaveEntry, LeaveType, Role } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
+import { db } from '../firebase';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 
 interface TeamPanelProps {
   currentUser: User;
@@ -11,7 +13,7 @@ interface TeamPanelProps {
 }
 
 const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser, activeUnit }) => {
-  const [allUsers, setAllUsers] = useState<User[]>(() => storageService.getUsers());
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [managingTech, setManagingTech] = useState<User | null>(null);
   const [editingTech, setEditingTech] = useState<User | null>(null);
   const [isGeneralCalendar, setIsGeneralCalendar] = useState(false);
@@ -20,6 +22,17 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser, activeUnit }) => {
   const today = getLocalDateString();
 
   const isMaster = currentUser.role === 'MASTER';
+
+  React.useEffect(() => {
+    const q = query(collection(db, 'users'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
+      setAllUsers(usersData);
+    }, (error) => {
+      console.error("Error listening to users in TeamPanel:", error);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const mantoTechs = useMemo(() => {
     return allUsers.filter(u => 
