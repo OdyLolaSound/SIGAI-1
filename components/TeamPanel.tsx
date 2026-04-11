@@ -22,7 +22,11 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentUser, activeUnit }) => {
   const isMaster = currentUser.role === 'MASTER';
 
   const mantoTechs = useMemo(() => {
-    return allUsers.filter(u => u.isManto && u.status === 'approved' && (isMaster || u.assignedUnits?.includes(activeUnit)));
+    return allUsers.filter(u => 
+      (u.isManto || u.userCategory === 'Técnico') && 
+      u.status === 'approved' && 
+      (isMaster || u.assignedUnits?.includes(activeUnit))
+    );
   }, [allUsers, activeUnit, isMaster]);
 
   const isAvailable = (user: User) => {
@@ -718,11 +722,16 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ tech, onClose, on
   const handleSave = () => {
     const entry: LeaveEntry = {
       id: crypto.randomUUID(),
+      userId: tech.id,
+      userName: tech.name,
       type,
       startDate,
       endDate,
       notes,
-      createdAt: new Date().toISOString()
+      status: 'approved',
+      createdAt: new Date().toISOString(),
+      approvers: [],
+      approvals: []
     };
     
     storageService.addLeaveEntry(tech.id, entry);

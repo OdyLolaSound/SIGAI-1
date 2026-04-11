@@ -2,18 +2,117 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'MASTER' || 
+         (request.auth.token.email == "JCYebenes@gmail.com" && request.auth.token.email_verified == true));
+    }
 
+    function isOficina() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userCategory == 'Oficina de Control' || isAdmin());
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Users
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Readings (Water, Light, etc.)
+    match /readings/{readingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Requests (Maintenance/Material)
+    match /requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Tasks
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Gasoil
+    match /gasoil_tanks/{id} { allow read, write: if isAuthenticated(); }
+    match /gasoil_readings/{id} { allow read, write: if isAuthenticated(); }
+    match /refuel_requests/{id} { allow read, write: if isAuthenticated(); }
+
+    // Salt
+    match /salt_stock/{id} { allow read, write: if isAuthenticated(); }
+    match /salt_softeners/{id} { allow read, write: if isAuthenticated(); }
+    match /salt_refill_logs/{id} { allow read, write: if isAuthenticated(); }
+    match /salt_entry_logs/{id} { allow read, write: if isAuthenticated(); }
+
+    // Water
+    match /water_accounts/{id} { allow read, write: if isAuthenticated(); }
+    match /water_sync_logs/{id} { allow read, write: if isAuthenticated(); }
+
+    // Notifications
+    match /notifications/{id} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.userId == 'all');
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.userId == 'all');
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.userId == 'all');
+    }
+
+    // External Contacts
+    match /external_contacts/{id} { allow read, write: if isAuthenticated(); }
+
+    // Boilers (The reported error area)
+    match /boilers/{id} { allow read, write: if isAuthenticated(); }
+    match /boiler_readings/{id} { allow read, write: if isAuthenticated(); }
+    match /boiler_maintenance/{id} { allow read, write: if isAuthenticated(); }
+
+    // Providers & Categories
+    match /providers/{id} { allow read, write: if isAuthenticated(); }
+    match /categories/{id} { allow read, write: if isAuthenticated(); }
+
+    // Electrical Designs
     match /electrical_designs/{designId} {
       allow read, write: if isAuthenticated() && 
         (resource == null || resource.data.userId == request.auth.uid) &&
         (request.resource == null || request.resource.data.userId == request.auth.uid);
     }
 
+    // Leave Requests (Permissions)
+    match /leave_requests/{id} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Default deny
     match /{path=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

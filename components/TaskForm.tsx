@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Send, User, Clock, MapPin, AlertCircle, Plus, Trash2, CheckSquare, Save, AlertTriangle, Building, Briefcase, Phone, Globe, Info, Mic, Loader2, Smartphone } from 'lucide-react';
+import { X, Send, User, Clock, MapPin, AlertCircle, Plus, Trash2, CheckSquare, Save, AlertTriangle, Building, Briefcase, Phone, Globe, Info, Mic, Loader2 } from 'lucide-react';
 import { CalendarTask, User as UserType, UrgencyLevel, ChecklistItem, ExternalUser, ExternalCategory } from '../types';
 import { storageService } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
@@ -34,12 +34,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
     location: '',
     recurrence: 'No',
     reminder: ['15 min antes'],
-    checklist: [],
-    whatsappNotification: {
-      enabled: false,
-      notifyAt: `${initialDate}T08:00:00`,
-      phoneNumber: user.phone || ''
-    }
+    checklist: []
   });
 
   const [newCheckItem, setNewCheckItem] = useState('');
@@ -106,11 +101,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
       recurrence: formData.recurrence as any || 'No',
       reminder: formData.reminder || [],
       checklist: formData.checklist || [],
-      whatsappNotification: formData.whatsappNotification || {
-        enabled: false,
-        notifyAt: new Date().toISOString(),
-        phoneNumber: ''
-      },
       createdBy: task?.createdBy || user.id,
       createdAt: task?.createdAt || new Date().toISOString()
     };
@@ -120,18 +110,18 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
     // Notify assigned users if it's a new task or new assignments
     const newAssignments = newTask.assignedTo.filter(uid => !task?.assignedTo.includes(uid));
     newAssignments.forEach(uid => {
-      if (uid !== user.id) {
-        storageService.addNotification({
-          id: crypto.randomUUID(),
-          userId: uid,
-          title: 'Nueva Tarea Asignada',
-          message: `Se te ha asignado la tarea: ${newTask.title}`,
-          type: 'task_assigned',
-          read: false,
-          date: new Date().toISOString(),
-          relatedId: newTask.id
-        });
-      }
+      // We notify everyone assigned, including the creator if they assigned it to themselves
+      // as they might want the alert on their dashboard
+      storageService.addNotification({
+        id: crypto.randomUUID(),
+        userId: uid,
+        title: 'Nueva Tarea Asignada',
+        message: `Se te ha asignado la tarea: ${newTask.title}`,
+        type: 'task_assigned',
+        read: false,
+        date: new Date().toISOString(),
+        relatedId: newTask.id
+      });
     });
 
     onClose();
@@ -404,93 +394,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
                   <Plus className="w-4 h-4" /> Añadir Externo (Contratista/Proveedor)
                 </button>
              </div>
-          </div>
-
-          {/* WhatsApp Notification */}
-          <div className="space-y-4 bg-green-50/50 p-6 rounded-[2.5rem] border border-green-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
-                  <Smartphone className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-[11px] font-black uppercase text-gray-900 leading-none">Aviso WhatsApp</h4>
-                  <p className="text-[8px] font-bold text-green-600 uppercase mt-1">Notificación Automática</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setFormData({
-                  ...formData, 
-                  whatsappNotification: { 
-                    ...(formData.whatsappNotification || { enabled: false, notifyAt: '', phoneNumber: '' }), 
-                    enabled: !formData.whatsappNotification?.enabled 
-                  }
-                })}
-                className={`w-12 h-6 rounded-full transition-all relative ${formData.whatsappNotification?.enabled ? 'bg-green-500' : 'bg-gray-200'}`}
-              >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.whatsappNotification?.enabled ? 'left-7' : 'left-1'}`} />
-              </button>
-            </div>
-
-            {formData.whatsappNotification?.enabled && (
-              <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-gray-400 px-1">Fecha Aviso</label>
-                    <input 
-                      type="date" 
-                      value={formData.whatsappNotification.notifyAt.split('T')[0]}
-                      onChange={e => setFormData({
-                        ...formData,
-                        whatsappNotification: {
-                          ...formData.whatsappNotification!,
-                          notifyAt: `${e.target.value}T${formData.whatsappNotification!.notifyAt.split('T')[1] || '08:00'}`
-                        }
-                      })}
-                      className="w-full p-3 bg-white rounded-xl text-[10px] font-black outline-none border border-green-100"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-gray-400 px-1">Hora Aviso</label>
-                    <input 
-                      type="time" 
-                      value={formData.whatsappNotification.notifyAt.split('T')[1]?.substring(0, 5) || '08:00'}
-                      onChange={e => setFormData({
-                        ...formData,
-                        whatsappNotification: {
-                          ...formData.whatsappNotification!,
-                          notifyAt: `${formData.whatsappNotification!.notifyAt.split('T')[0]}T${e.target.value}:00`
-                        }
-                      })}
-                      className="w-full p-3 bg-white rounded-xl text-[10px] font-black outline-none border border-green-100"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-gray-400 px-1">Teléfono WhatsApp</label>
-                  <div className="flex gap-2">
-                    <div className="bg-white p-3 rounded-xl text-[10px] font-black text-gray-400 border border-green-100">+34</div>
-                    <input 
-                      type="tel" 
-                      placeholder="600000000"
-                      value={formData.whatsappNotification.phoneNumber}
-                      onChange={e => setFormData({
-                        ...formData,
-                        whatsappNotification: {
-                          ...formData.whatsappNotification!,
-                          phoneNumber: e.target.value
-                        }
-                      })}
-                      className="flex-1 p-3 bg-white rounded-xl text-[10px] font-black outline-none border border-green-100"
-                    />
-                  </div>
-                </div>
-                <div className="bg-white/50 p-3 rounded-xl flex gap-2 items-center">
-                  <Info className="w-3 h-3 text-green-600 shrink-0" />
-                  <p className="text-[7px] font-bold text-green-800 uppercase leading-snug">Recibirás un mensaje automático el día y hora seleccionados.</p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Checklist */}

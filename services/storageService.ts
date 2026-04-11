@@ -2,7 +2,7 @@
 import { Reading, Building, ServiceType, Role, User, UserStatus, UserCategory, RequestItem, GasoilTank, Boiler, BoilerTemperatureReading, BoilerMaintenanceRecord, BoilerPart, BoilerStatus, SaltWarehouse, SaltSoftener, CalendarTask, AppNotification, GasoilReading, RefuelRequest, SaltRefillLog, SaltEntryLog, ExternalUser, WaterAccount, WaterSyncLog, GasoilAlertStatus, Provider, MaterialCategory, MaterialItem, LeaveEntry } from '../types';
 import { getLocalDateString, isWorkDay, isWeekend } from './dateUtils';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
-import { collection, doc, setDoc, getDocs, onSnapshot, query, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, onSnapshot, query, updateDoc, deleteDoc, getDoc, where } from 'firebase/firestore';
 
 // Constants that don't change
 export const BUILDINGS: Building[] = [
@@ -48,14 +48,29 @@ let cache: any = {
   boiler_readings: [],
   boiler_maintenance: [],
   providers: [],
-  categories: []
+  categories: [],
+  leave_requests: []
+};
+
+// Helper to remove undefined values before saving to Firestore
+const cleanData = (data: any) => {
+  if (!data || typeof data !== 'object') return data;
+  const clean: any = Array.isArray(data) ? [] : {};
+  Object.keys(data).forEach(key => {
+    if (data[key] !== undefined) {
+      clean[key] = (typeof data[key] === 'object' && data[key] !== null) 
+        ? cleanData(data[key]) 
+        : data[key];
+    }
+  });
+  return clean;
 };
 
 let activeListeners: (() => void)[] = [];
 
 // Helper to initialize a collection listener
-function setupListener(collectionName: string, cacheKey: string) {
-  const q = query(collection(db, collectionName));
+function setupListener(collectionName: string, cacheKey: string, customQuery?: any) {
+  const q = customQuery || query(collection(db, collectionName));
   return onSnapshot(q, (snapshot) => {
     const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
     console.log(`[DEBUG] Listener ${collectionName} updated: ${data.length} items`);
@@ -153,7 +168,7 @@ export const storageService = {
     console.log('[DEBUG] Real water data seeded in cache and Firestore. Total readings in cache:', cache.readings.length);
   },
 
-  startListeners: () => {
+  startListeners: (userId?: string) => {
     if (activeListeners.length > 0) return;
 
     activeListeners = [
@@ -170,13 +185,16 @@ export const storageService = {
       setupListener('water_accounts', 'water_accounts'),
       setupListener('water_sync_logs', 'water_sync_logs'),
       setupListener('tasks', 'tasks'),
-      setupListener('notifications', 'notifications'),
+      userId 
+        ? setupListener('notifications', 'notifications', query(collection(db, 'notifications'), where('userId', 'in', Array.from(new Set([userId, 'all'])))))
+        : setupListener('notifications', 'notifications'),
       setupListener('external_contacts', 'external_contacts'),
       setupListener('boilers', 'boilers'),
       setupListener('boiler_readings', 'boiler_readings'),
       setupListener('boiler_maintenance', 'boiler_maintenance'),
       setupListener('providers', 'providers'),
       setupListener('categories', 'categories'),
+      setupListener('leave_requests', 'leave_requests'),
     ];
   },
 
@@ -258,9 +276,11 @@ export const storageService = {
       handleFirestoreError(e, OperationType.UPDATE, 'users');
     }
   },
-  updateUserStatus: async (userId: string, status: UserStatus, assignedBuildings: string[], assignedUnits: Role[], userCategory?: UserCategory) => {
+  updateUserStatus: async (userId: string, status: UserStatus, assignedBuildings: string[], assignedUnits: Role[], userCategory?: UserCategory, isManto?: boolean) => {
     try {
-      await updateDoc(doc(db, 'users', userId), { status, assignedBuildings, assignedUnits, userCategory });
+      const updateData: any = { status, assignedBuildings, assignedUnits, userCategory };
+      if (isManto !== undefined) updateData.isManto = isManto;
+      await updateDoc(doc(db, 'users', userId), updateData);
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'users');
     }
@@ -286,15 +306,42 @@ export const storageService = {
       handleFirestoreError(e, OperationType.DELETE, 'users');
     }
   },
+  
+  // --- LEAVE REQUESTS ---
+  getLeaveRequests: (): LeaveEntry[] => cache.leave_requests,
+  saveLeaveRequest: async (request: LeaveEntry) => {
+    try {
+      await setDoc(doc(db, 'leave_requests', request.id), cleanData(request));
+      
+      // If it's approved, we also update the user's leaveDays for the calendar view
+      if (request.status === 'approved') {
+        const user = cache.users.find((u: any) => u.id === request.userId);
+        if (user) {
+          const updatedLeaveDays = [...new Set([...(user.leaveDays || []), request.startDate])];
+          await updateDoc(doc(db, 'users', request.userId), { leaveDays: updatedLeaveDays });
+        }
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'leave_requests');
+    }
+  },
+  deleteLeaveRequest: async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'leave_requests', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'leave_requests');
+    }
+  },
   addLeaveEntry: async (userId: string, entry: LeaveEntry) => {
     try {
+      // New logic: save to leave_requests collection
+      await setDoc(doc(db, 'leave_requests', entry.id), cleanData(entry));
+      
+      // Legacy support: also update user doc if needed (though we'll move to collection)
       const user = cache.users.find((u: any) => u.id === userId);
       if (user) {
-        // We add the startDate to leaveDays for simplicity in the UI check
-        const updatedLeaveDays = [...(user.leaveDays || []), entry.startDate];
         const updatedLeaveEntries = [...(user.leaveEntries || []), entry];
         await updateDoc(doc(db, 'users', userId), { 
-          leaveDays: updatedLeaveDays,
           leaveEntries: updatedLeaveEntries
         });
       }
@@ -579,7 +626,7 @@ export const storageService = {
   // --- NOTIFICATIONS ---
   getNotifications: (userId?: string): AppNotification[] => {
     if (userId) {
-      return cache.notifications.filter((n: any) => n.userId === userId);
+      return cache.notifications.filter((n: any) => n.userId === userId || n.userId === 'all');
     }
     return cache.notifications;
   },
@@ -611,11 +658,18 @@ export const storageService = {
       handleFirestoreError(e, OperationType.UPDATE, 'notifications');
     }
   },
+  deleteNotification: async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'notifications');
+    }
+  },
   clearNotifications: async (userId?: string) => {
     try {
       const batch: any = [];
       const toDelete = userId 
-        ? cache.notifications.filter((n: any) => n.userId === userId)
+        ? cache.notifications.filter((n: any) => n.userId === userId || n.userId === 'all')
         : cache.notifications;
       
       toDelete.forEach((n: any) => {

@@ -1,9 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, X, Trash2, AlertCircle } from 'lucide-react';
-import { User, LeaveType, LeaveEntry } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, X, Trash2, AlertCircle, User as UserIcon, CheckCircle2, Clock, FileText, Download, ShieldCheck } from 'lucide-react';
+import { User, LeaveType, LeaveEntry, Approval } from '../types';
 import { storageService } from '../services/storageService';
 import { getLocalDateString, isHoliday } from '../services/dateUtils';
+import SignaturePad from './SignaturePad';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface LaborCalendarProps {
   user: User;
@@ -40,6 +43,27 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
   const [selectedType, setSelectedType] = useState<LeaveType>(LEAVE_TYPES[0]);
   const [notes, setNotes] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedApprovers, setSelectedApprovers] = useState<string[]>([]);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<LeaveEntry[]>([]);
+  const [signingApprovalId, setSigningApprovalId] = useState<string | null>(null);
+
+  const isTecnico = user.userCategory === 'Técnico';
+  const isOficina = user.userCategory === 'Oficina de Control' || user.role === 'MASTER';
+  const oficinaUsers = useMemo(() => storageService.getUsers().filter(u => u.userCategory === 'Oficina de Control' && u.id !== user.id), []);
+
+  useEffect(() => {
+    if (isOficina) {
+      const allRequests = storageService.getLeaveRequests();
+      const pending = allRequests.filter(r => 
+        r.approvers.includes(user.id) && 
+        !r.approvals.find(a => a.userId === user.id) &&
+        r.status !== 'rejected' &&
+        r.status !== 'approved'
+      );
+      setPendingApprovals(pending);
+    }
+  }, [isOficina, user.id, storageService.getLeaveRequests()]);
 
   const daysInMonth = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -78,80 +102,182 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
     }
   };
 
-  const handleAddLeave = async () => {
+  const handleAddLeave = () => {
     if (!startDate) return;
-    
+    if (isTecnico && selectedApprovers.length < 2) {
+      alert("Debes seleccionar 2 usuarios de Oficina de Control para la aprobación.");
+      return;
+    }
+    setShowSignaturePad(true);
+  };
+
+  const submitLeaveRequest = async (signature: string) => {
     const finalEndDate = endDate || startDate;
     const newEntry: LeaveEntry = {
       id: crypto.randomUUID(),
+      userId: user.id,
+      userName: user.name,
       type: selectedType,
-      startDate,
-      endDate: finalEndDate,
-      notes: selectedType === 'PV - PERMISOS VARIOS' ? notes : undefined,
-      createdAt: new Date().toISOString()
+      startDate: startDate!,
+      endDate: finalEndDate!,
+      notes: selectedType === 'PV - PERMISOS VARIOS' ? notes : '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      requesterSignature: signature,
+      approvers: selectedApprovers,
+      approvals: []
     };
 
-    // Generate all dates in between
-    const dates: string[] = [];
-    let current = new Date(startDate);
-    const end = new Date(finalEndDate);
-    while (current <= end) {
-      dates.push(getLocalDateString(current));
-      current.setDate(current.getDate() + 1);
-    }
-
-    const updatedLeaveDays = [...new Set([...(user.leaveDays || []), ...dates])];
-    const updatedLeaveEntries = [...(user.leaveEntries || []), newEntry];
-
-    const updatedUser = {
-      ...user,
-      leaveDays: updatedLeaveDays,
-      leaveEntries: updatedLeaveEntries
-    };
-
-    await storageService.updateUser(updatedUser);
-    onUpdate(updatedUser);
+    await storageService.saveLeaveRequest(newEntry);
     
+    // Notify approvers
+    selectedApprovers.forEach(approverId => {
+      storageService.addNotification({
+        id: crypto.randomUUID(),
+        userId: approverId,
+        title: 'Nueva Solicitud de Permiso',
+        message: `${user.name} ha solicitado un permiso de ${selectedType}.`,
+        type: 'system',
+        read: false,
+        date: new Date().toISOString(),
+        relatedId: newEntry.id
+      });
+    });
+
     setStartDate(null);
     setEndDate(null);
     setNotes('');
+    setSelectedApprovers([]);
+    setShowSignaturePad(false);
     setIsAdding(false);
   };
 
-  const handleRemoveEntry = async (entryId: string) => {
-    const entry = user.leaveEntries?.find(e => e.id === entryId);
-    if (!entry) return;
+  const handleApprove = (requestId: string) => {
+    setSigningApprovalId(requestId);
+  };
 
-    // Remove dates associated with this entry
-    const datesToRemove: string[] = [];
-    let current = new Date(entry.startDate);
-    const end = new Date(entry.endDate);
-    while (current <= end) {
-      datesToRemove.push(getLocalDateString(current));
-      current.setDate(current.getDate() + 1);
-    }
-
-    const updatedLeaveEntries = (user.leaveEntries || []).filter(e => e.id !== entryId);
+  const submitApproval = async (signature: string) => {
+    if (!signingApprovalId) return;
     
-    // Recalculate leaveDays from remaining entries
-    const remainingDates = new Set<string>();
-    updatedLeaveEntries.forEach(e => {
-      let curr = new Date(e.startDate);
-      const en = new Date(e.endDate);
-      while (curr <= en) {
-        remainingDates.add(getLocalDateString(curr));
-        curr.setDate(curr.getDate() + 1);
-      }
-    });
+    const request = storageService.getLeaveRequests().find(r => r.id === signingApprovalId);
+    if (!request) return;
 
-    const updatedUser = {
-      ...user,
-      leaveDays: Array.from(remainingDates),
-      leaveEntries: updatedLeaveEntries
+    const newApproval: Approval = {
+      userId: user.id,
+      userName: user.name,
+      status: 'approved',
+      signature,
+      date: new Date().toISOString()
     };
 
-    await storageService.updateUser(updatedUser);
-    onUpdate(updatedUser);
+    const updatedApprovals = [...request.approvals, newApproval];
+    let newStatus: LeaveEntry['status'] = 'partially_approved';
+    
+    // Check if all required approvers have approved
+    if (updatedApprovals.length >= request.approvers.length) {
+      newStatus = 'approved';
+    }
+
+    const updatedRequest: LeaveEntry = {
+      ...request,
+      approvals: updatedApprovals,
+      status: newStatus
+    };
+
+    await storageService.saveLeaveRequest(updatedRequest);
+    
+    // Notify requester
+    storageService.addNotification({
+      id: crypto.randomUUID(),
+      userId: request.userId,
+      title: newStatus === 'approved' ? 'Permiso Aprobado' : 'Permiso Parcialmente Aprobado',
+      message: `${user.name} ha firmado tu solicitud de permiso.`,
+      type: 'system',
+      read: false,
+      date: new Date().toISOString(),
+      relatedId: request.id
+    });
+
+    setSigningApprovalId(null);
+  };
+
+  const generatePDF = (entry: LeaveEntry) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(22);
+    doc.text('SOLICITUD DE PERMISO / LICENCIA', 105, 20, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`ID Solicitud: ${entry.id}`, 20, 35);
+    doc.text(`Fecha de Solicitud: ${new Date(entry.createdAt).toLocaleDateString()}`, 20, 42);
+    
+    // User Info
+    doc.setFontSize(14);
+    doc.text('DATOS DEL SOLICITANTE', 20, 55);
+    doc.line(20, 57, 190, 57);
+    
+    doc.setFontSize(12);
+    doc.text(`Nombre: ${entry.userName}`, 20, 65);
+    doc.text(`Categoría: ${isTecnico ? 'Técnico' : 'Oficina de Control'}`, 20, 72);
+    
+    // Leave Info
+    doc.setFontSize(14);
+    doc.text('DETALLES DEL PERMISO', 20, 85);
+    doc.line(20, 87, 190, 87);
+    
+    doc.setFontSize(12);
+    doc.text(`Tipo: ${entry.type}`, 20, 95);
+    doc.text(`Periodo: Del ${entry.startDate} al ${entry.endDate}`, 20, 102);
+    if (entry.notes) {
+      doc.text(`Observaciones: ${entry.notes}`, 20, 109);
+    }
+    
+    // Signatures
+    doc.setFontSize(14);
+    doc.text('FIRMAS Y APROBACIONES', 20, 125);
+    doc.line(20, 127, 190, 127);
+    
+    // Requester Signature
+    if (entry.requesterSignature) {
+      doc.setFontSize(10);
+      doc.text('Firma del Solicitante:', 20, 140);
+      doc.addImage(entry.requesterSignature, 'PNG', 20, 145, 50, 25);
+      doc.text(entry.userName, 20, 175);
+    }
+    
+    // Approver Signatures
+    let yPos = 140;
+    entry.approvals.forEach((app, idx) => {
+      const xPos = 80 + (idx * 60);
+      doc.setFontSize(10);
+      doc.text(`Aprobado por:`, xPos, yPos);
+      if (app.signature) {
+        doc.addImage(app.signature, 'PNG', xPos, yPos + 5, 50, 25);
+      }
+      doc.text(app.userName, xPos, yPos + 35);
+      doc.text(new Date(app.date!).toLocaleDateString(), xPos, yPos + 40);
+    });
+    
+    // Status Stamp
+    doc.setFontSize(20);
+    doc.setTextColor(entry.status === 'approved' ? 0 : 200, entry.status === 'approved' ? 150 : 0, 0);
+    doc.text(entry.status.toUpperCase(), 105, 250, { align: 'center' });
+    
+    doc.save(`Permiso_${entry.userName}_${entry.startDate}.pdf`);
+  };
+
+  const toggleApprover = (id: string) => {
+    setSelectedApprovers(prev => 
+      prev.includes(id) ? prev.filter(aid => aid !== id) : [...prev, id]
+    );
+  };
+
+  const handleRemoveEntry = async (entryId: string) => {
+    // Logic to remove from leave_requests collection
+    // For now we'll just implement it as a delete in storageService
+    // (I'll add deleteLeaveRequest to storageService in a moment)
+    await storageService.deleteLeaveRequest(entryId);
   };
 
   const isInRange = (dateStr: string) => {
@@ -162,11 +288,45 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
   };
 
   const getLeaveTypeForDate = (dateStr: string) => {
-    return user.leaveEntries?.find(e => dateStr >= e.startDate && dateStr <= e.endDate);
+    return storageService.getLeaveRequests().find(e => e.userId === user.id && dateStr >= e.startDate && dateStr <= e.endDate);
   };
 
   return (
     <div className="space-y-6">
+      {/* SECCIÓN DE APROBACIONES PENDIENTES (Solo Oficina) */}
+      {isOficina && pendingApprovals.length > 0 && (
+        <div className="bg-amber-50 border-2 border-amber-100 rounded-[2.5rem] p-6 space-y-4 animate-in slide-in-from-top-4">
+          <div className="flex items-center gap-3 px-2">
+            <ShieldCheck className="w-5 h-5 text-amber-600" />
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-800">Aprobaciones Pendientes</h4>
+            <span className="bg-amber-200 text-amber-800 text-[8px] font-black px-2 py-0.5 rounded-full">{pendingApprovals.length}</span>
+          </div>
+          
+          <div className="space-y-3">
+            {pendingApprovals.map(req => (
+              <div key={req.id} className="bg-white rounded-2xl p-4 shadow-sm border border-amber-100 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center font-black text-[10px]">
+                    {req.userName.substring(0,2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black text-gray-900 uppercase leading-none mb-1">{req.userName}</div>
+                    <div className="text-[8px] font-bold text-amber-600 uppercase tracking-widest">{req.type}</div>
+                    <div className="text-[8px] text-gray-400 font-bold mt-1">Del {req.startDate} al {req.endDate}</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleApprove(req.id)}
+                  className="px-4 py-2 bg-gray-900 text-yellow-400 rounded-xl font-black uppercase text-[8px] tracking-widest active:scale-95 transition-all"
+                >
+                  Firmar y Aprobar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -271,52 +431,112 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
               </div>
             )}
 
+            {/* Selección de Aprobadores (Solo para Técnicos) */}
+            {isTecnico && (
+              <div className="space-y-3">
+                <label className="text-[8px] font-black uppercase tracking-widest text-gray-500 block px-1">Seleccionar 2 Responsables (Oficina de Control)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {oficinaUsers.map(oficina => (
+                    <button
+                      key={oficina.id}
+                      onClick={() => toggleApprover(oficina.id)}
+                      className={`p-3 rounded-xl border-2 transition-all flex items-center gap-2 ${selectedApprovers.includes(oficina.id) ? 'bg-yellow-400 border-yellow-400 text-black' : 'bg-white/5 border-white/10 text-white/40'}`}
+                    >
+                      <UserIcon className="w-3 h-3" />
+                      <span className="text-[9px] font-black uppercase truncate">{oficina.name.split(' ')[0]}</span>
+                    </button>
+                  ))}
+                </div>
+                {selectedApprovers.length < 2 && (
+                  <p className="text-[7px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1">
+                    <AlertCircle className="w-2 h-2" /> Faltan {2 - selectedApprovers.length} responsables
+                  </p>
+                )}
+              </div>
+            )}
+
             <button 
               onClick={handleAddLeave}
               className="w-full p-5 bg-yellow-400 text-black rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              <Plus className="w-4 h-4" /> Registrar Permiso
+              <Plus className="w-4 h-4" /> {isTecnico ? 'Solicitar y Firmar' : 'Registrar Permiso'}
             </button>
           </div>
         </div>
       )}
 
       <div className="space-y-4">
-        <h5 className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">Permisos Registrados</h5>
-        {(!user.leaveEntries || user.leaveEntries.length === 0) ? (
+        <h5 className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">Mis Solicitudes de Permiso</h5>
+        {storageService.getLeaveRequests().filter(r => r.userId === user.id).length === 0 ? (
           <div className="bg-gray-50 border-2 border-dashed border-gray-100 rounded-[2rem] p-8 text-center">
             <CalendarIcon className="w-8 h-8 text-gray-200 mx-auto mb-2" />
             <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">No hay permisos registrados</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {[...(user.leaveEntries || [])].sort((a,b) => b.startDate.localeCompare(a.startDate)).map(entry => (
-              <div key={entry.id} className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:border-red-100 transition-all">
+            {storageService.getLeaveRequests().filter(r => r.userId === user.id).sort((a,b) => b.startDate.localeCompare(a.startDate)).map(entry => (
+              <div key={entry.id} className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:border-yellow-100 transition-all">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl flex items-center justify-center font-black text-[10px]">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-[10px] ${
+                    entry.status === 'approved' ? 'bg-green-50 text-green-600' :
+                    entry.status === 'rejected' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
+                  }`}>
                     {entry.type.split(' - ')[0]}
                   </div>
                   <div>
                     <div className="text-[10px] font-black text-gray-900 uppercase leading-none mb-1">
                       {entry.type.split(' - ')[1] || entry.type}
-                      {entry.notes && <span className="text-[8px] text-gray-400 ml-2 normal-case font-bold">({entry.notes})</span>}
+                      <span className={`ml-2 text-[7px] px-1.5 py-0.5 rounded-full ${
+                        entry.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        entry.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {entry.status === 'approved' ? 'APROBADO' : 
+                         entry.status === 'partially_approved' ? 'PARCIAL' : 'PENDIENTE'}
+                      </span>
                     </div>
                     <div className="text-xs font-black text-gray-500 uppercase tracking-tight">
                       {entry.startDate === entry.endDate ? entry.startDate : `Del ${entry.startDate} al ${entry.endDate}`}
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => handleRemoveEntry(entry.id)}
-                  className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex gap-2">
+                  {entry.status === 'approved' && (
+                    <button 
+                      onClick={() => generatePDF(entry)}
+                      className="p-2 text-blue-400 hover:bg-blue-50 rounded-lg transition-all"
+                      title="Descargar PDF"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => handleRemoveEntry(entry.id)}
+                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {showSignaturePad && (
+        <SignaturePad 
+          onSave={submitLeaveRequest}
+          onCancel={() => setShowSignaturePad(false)}
+          title="Firma del Solicitante"
+        />
+      )}
+
+      {signingApprovalId && (
+        <SignaturePad 
+          onSave={submitApproval}
+          onCancel={() => setSigningApprovalId(null)}
+          title="Firma de Aprobación"
+        />
+      )}
     </div>
   );
 };

@@ -22,6 +22,12 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onClose
     setNotifications(storageService.getNotifications(userId));
   };
 
+  const handleDeleteOne = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    storageService.deleteNotification(id);
+    setNotifications(storageService.getNotifications(userId));
+  };
+
   const handleClearAll = () => {
     if (confirm("¿Limpiar todas las notificaciones?")) {
       storageService.clearNotifications(userId);
@@ -84,7 +90,15 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onClose
                     {getTypeIcon(n.type)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className={`text-[11px] font-black uppercase leading-none mb-1 ${n.read ? 'text-gray-500' : 'text-gray-900'}`}>{n.title}</h4>
+                    <div className="flex justify-between items-start">
+                      <h4 className={`text-[11px] font-black uppercase leading-none mb-1 ${n.read ? 'text-gray-500' : 'text-gray-900'}`}>{n.title}</h4>
+                      <button 
+                        onClick={(e) => handleDeleteOne(e, n.id)}
+                        className="p-1 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                     <p className="text-[10px] text-gray-400 leading-snug line-clamp-2">{n.message}</p>
                     <div className="flex items-center gap-2 mt-3 text-[8px] font-black text-gray-300 uppercase">
                       <Clock className="w-3 h-3" />

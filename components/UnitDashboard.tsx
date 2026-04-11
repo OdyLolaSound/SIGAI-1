@@ -1,16 +1,18 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Calendar, MessageSquare, Package, Zap, Droplets, Flame, 
   Users, ClipboardList, Camera, FileText, BookOpen, Map,
   ChevronRight, ArrowUpRight, ArrowDownRight, AlertCircle,
   TrendingUp, Settings, ShieldAlert, Timer, CheckCircle2,
   Warehouse, FileSpreadsheet, HardHat, Fuel, Globe, Bell,
-  Wrench
+  Wrench, X, Clock, CalendarDays
 } from 'lucide-react';
-import { AppTab, User, ServiceType, Building, Role, UrgencyLevel } from '../types';
+import { AppTab, User, ServiceType, Building, Role, UrgencyLevel, AppNotification } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
+import { db } from '../firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 interface UnitDashboardProps {
   user: User;
@@ -22,38 +24,60 @@ interface UnitDashboardProps {
 
 const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavigate, onServiceClick, onRequestClick }) => {
   const isMaster = user.role === 'MASTER';
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
+  const [snoozeData, setSnoozeData] = useState<{ id: string, date: string } | null>(null);
+
+  // REAL-TIME NOTIFICATIONS LISTENER
+  useEffect(() => {
+    // We want to see notifications for the specific user AND general system notifications ('all')
+    const userIds = Array.from(new Set([user.id, 'all']));
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', 'in', userIds),
+      where('read', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as AppNotification[];
+      // Sort by date descending
+      setNotifications(data.sort((a, b) => b.date.localeCompare(a.date)));
+    });
+
+    return () => unsubscribe();
+  }, [user.id]);
   
   // DATA CALCULATIONS
   const tasks = useMemo(() => storageService.getTasks().filter(t => isMaster || t.type === activeUnit), [activeUnit, isMaster]);
+  const todayTasks = useMemo(() => {
+    const today = getLocalDateString();
+    return tasks.filter(t => t.startDate === today && t.status !== 'Completada');
+  }, [tasks]);
+
   const requests = useMemo(() => storageService.getRequests().filter(r => isMaster || r.unit === activeUnit), [activeUnit, isMaster]);
   const team = useMemo(() => storageService.getUsers().filter(u => isMaster || u.assignedUnits?.includes(activeUnit)), [activeUnit, isMaster]);
   const waterReadings = useMemo(() => storageService.getReadings('BASE_ALICANTE', 'agua'), []);
-  const notifications = useMemo(() => storageService.getNotifications().filter(n => !n.read).sort((a, b) => b.date.localeCompare(a.date)), []);
   
   const pendingTasksCount = tasks.filter(t => t.status !== 'Completada').length;
   const urgentRequests = requests.filter(r => r.urgency === 'Crítica' && r.status !== 'closed').length;
   const mediumRequests = requests.filter(r => (r.urgency === 'Alta' || r.urgency === 'Media') && r.status !== 'closed').length;
   
-  const activeTechs = useMemo(() => {
+  const techniciansStatus = useMemo(() => {
     const today = getLocalDateString();
-    return team.filter(u => 
-      u.status === 'approved' && 
-      u.isManto && 
-      (!u.leaveDays || !u.leaveDays.includes(today))
-    ).length;
+    return team.filter(u => u.status === 'approved' && u.isManto)
+      .map(u => {
+        const isOnLeave = u.leaveDays?.includes(today);
+        const entry = u.leaveEntries?.find(e => today >= e.startDate && today <= e.endDate);
+        return {
+          id: u.id,
+          name: u.name,
+          isActive: !isOnLeave,
+          leaveType: entry?.type
+        };
+      });
   }, [team]);
 
-  const techniciansOnLeave = useMemo(() => {
-    const today = getLocalDateString();
-    return team.filter(u => 
-      u.status === 'approved' && 
-      u.isManto && 
-      u.leaveDays?.includes(today)
-    ).map(u => {
-      const entry = u.leaveEntries?.find(e => today >= e.startDate && today <= e.endDate);
-      return { name: u.name, type: entry?.type };
-    });
-  }, [team]);
+  const activeTechs = techniciansStatus.filter(t => t.isActive).length;
 
   // Real data for water
   const waterLast = waterReadings[waterReadings.length - 1];
@@ -79,24 +103,159 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
   const isRestricted = !isMaster && activeUnit !== 'USAC';
   const isTecnico = user.userCategory === 'Técnico';
   
+  const handleMarkRead = (id: string) => {
+    storageService.markNotificationAsRead(id);
+    setConfirmCloseId(null);
+  };
+
+  const handleSnooze = async () => {
+    if (!snoozeData) return;
+    
+    const notification = notifications.find(n => n.id === snoozeData.id);
+    if (!notification || !notification.relatedId) return;
+    
+    const task = storageService.getTasks().find(t => t.id === notification.relatedId);
+    if (task) {
+      const updatedTask = {
+        ...task,
+        startDate: snoozeData.date,
+        status: 'Pospuesta' as const
+      };
+      
+      await storageService.saveTask(updatedTask);
+      await storageService.markNotificationAsRead(notification.id);
+      
+      // Add a system notification about the snooze
+      await storageService.addNotification({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        title: 'Tarea Pospuesta',
+        message: `Has pospuesto "${task.title}" para el ${snoozeData.date}`,
+        type: 'system',
+        read: false,
+        date: new Date().toISOString()
+      });
+    }
+    setSnoozeData(null);
+  };
+
   return (
     <div className="w-full max-w-sm mx-auto space-y-10 pb-12 animate-in fade-in duration-500">
       
-      {/* NOTIFICACIONES CRÍTICAS */}
-      {notifications.length > 0 && (
+      {/* NOTIFICACIONES CRÍTICAS Y TAREAS DE HOY */}
+      {(notifications.length > 0 || todayTasks.length > 0) && (
         <div className="px-2 space-y-3">
-          {notifications.slice(0, 2).map(n => (
-            <div key={n.id} className="bg-red-50 border-2 border-red-100 rounded-3xl p-5 flex gap-4 animate-in slide-in-from-top-4">
-              <div className="bg-red-500 p-3 rounded-2xl text-white h-fit">
-                <ShieldAlert className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-start mb-1">
-                  <h4 className="text-[11px] font-black uppercase text-red-900">{n.title}</h4>
-                  <button onClick={() => storageService.markNotificationAsRead(n.id)} className="text-[8px] font-black text-red-400 uppercase">Cerrar</button>
+          {/* Tareas de Hoy (Si no hay notificación específica) */}
+          {todayTasks.length > 0 && notifications.every(n => n.type !== 'today_summary') && (
+            <div key="today-tasks-banner" className="bg-red-600 border-2 border-red-500 rounded-3xl p-5 flex flex-col gap-3 animate-in slide-in-from-top-4 shadow-lg relative overflow-hidden">
+               <div className="flex gap-4">
+                  <div className="bg-white p-3 rounded-2xl text-red-600 h-fit">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-[11px] font-black uppercase text-white">Tareas Programadas para Hoy</h4>
+                    <p className="text-[10px] font-bold text-red-100 leading-relaxed uppercase tracking-tight">
+                      Tienes {todayTasks.length} {todayTasks.length === 1 ? 'tarea pendiente' : 'tareas pendientes'} para hoy.
+                    </p>
+                  </div>
+               </div>
+               <button 
+                 onClick={() => onNavigate(AppTab.CALENDAR)}
+                 className="w-full py-3 bg-white text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm active:scale-95"
+               >
+                 Ver Agenda de Hoy
+               </button>
+            </div>
+          )}
+
+          {/* Notificaciones Reales */}
+          {notifications.map(n => (
+            <div key={n.id} className="bg-red-50 border-2 border-red-100 rounded-3xl p-5 flex flex-col gap-3 animate-in slide-in-from-top-4 shadow-sm relative overflow-hidden">
+              <div className="flex gap-4">
+                <div className="bg-red-500 p-3 rounded-2xl text-white h-fit">
+                  <ShieldAlert className="w-5 h-5" />
                 </div>
-                <p className="text-[10px] font-bold text-red-700 leading-relaxed uppercase tracking-tight">{n.message}</p>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="text-[11px] font-black uppercase text-red-900">{n.title}</h4>
+                    <button 
+                      onClick={() => setConfirmCloseId(n.id)} 
+                      className="text-[8px] font-black text-red-400 uppercase bg-red-100/50 px-2 py-1 rounded-lg active:scale-90 transition-all"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                  <p className="text-[10px] font-bold text-red-700 leading-relaxed uppercase tracking-tight">{n.message}</p>
+                </div>
               </div>
+              
+              {n.type === 'task_assigned' && n.relatedId && (
+                <div className="flex gap-2 mt-1">
+                  <button 
+                    onClick={() => onNavigate(AppTab.CALENDAR)}
+                    className="flex-1 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm active:scale-95"
+                  >
+                    Ver en Agenda
+                  </button>
+                  <button 
+                    onClick={() => setSnoozeData({ id: n.id, date: getLocalDateString() })}
+                    className="flex-1 py-3 bg-white border border-red-200 text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95"
+                  >
+                    Posponer
+                  </button>
+                </div>
+              )}
+
+              {/* Overlay de Confirmación de Cierre */}
+              {confirmCloseId === n.id && (
+                <div className="absolute inset-0 bg-red-600/95 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center z-10 animate-in fade-in zoom-in-95">
+                  <p className="text-white font-black uppercase text-[10px] mb-4 tracking-widest">¿Confirmar lectura y cerrar alerta?</p>
+                  <div className="flex gap-3 w-full">
+                    <button 
+                      onClick={() => handleMarkRead(n.id)}
+                      className="flex-1 py-3 bg-white text-red-600 rounded-xl font-black uppercase text-[9px] shadow-xl active:scale-95"
+                    >
+                      Sí, Cerrar
+                    </button>
+                    <button 
+                      onClick={() => setConfirmCloseId(null)}
+                      className="flex-1 py-3 bg-red-800 text-white/70 rounded-xl font-black uppercase text-[9px] active:scale-95"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Overlay de Posponer (Date Picker) */}
+              {snoozeData?.id === n.id && (
+                <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center z-10 animate-in fade-in zoom-in-95">
+                  <div className="bg-yellow-400 p-2 rounded-xl mb-3">
+                    <CalendarDays className="w-5 h-5 text-black" />
+                  </div>
+                  <p className="text-white font-black uppercase text-[10px] mb-4 tracking-widest">Elegir Nueva Fecha</p>
+                  <input 
+                    type="date" 
+                    value={snoozeData.date}
+                    onChange={(e) => setSnoozeData({ ...snoozeData, date: e.target.value })}
+                    className="w-full p-3 bg-white rounded-xl font-black text-xs mb-4 outline-none text-center"
+                  />
+                  <div className="flex gap-3 w-full">
+                    <button 
+                      onClick={handleSnooze}
+                      className="flex-1 py-3 bg-yellow-400 text-black rounded-xl font-black uppercase text-[9px] shadow-xl active:scale-95"
+                    >
+                      Confirmar
+                    </button>
+                    <button 
+                      onClick={() => setSnoozeData(null)}
+                      className="flex-1 py-3 bg-gray-800 text-white/70 rounded-xl font-black uppercase text-[9px] active:scale-95"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -237,14 +396,26 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
                     </button>
                  </div>
 
-                 {techniciansOnLeave.length > 0 && (
-                   <div className="mb-6 p-4 bg-red-50 rounded-2xl border border-red-100">
-                     <div className="text-[8px] font-black text-red-400 uppercase tracking-widest mb-2">Bajas / Permisos Hoy</div>
-                     <div className="space-y-2">
-                       {techniciansOnLeave.map((tech, i) => (
-                         <div key={i} className="flex justify-between items-center">
-                           <span className="text-[10px] font-black text-gray-900 uppercase">{tech.name}</span>
-                           <span className="text-[8px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-lg uppercase">{tech.type || 'Libre'}</span>
+                 {techniciansStatus.length > 0 && (
+                   <div className="mb-6 space-y-3">
+                     <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-2">Estado del Equipo Hoy</div>
+                     <div className="grid grid-cols-1 gap-2">
+                       {techniciansStatus.map((tech) => (
+                         <div key={tech.id} className="flex justify-between items-center p-2 rounded-xl bg-gray-50/50 border border-gray-100/50">
+                           <div className="flex items-center gap-2">
+                             <div className={`w-2 h-2 rounded-full ${tech.isActive ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`} />
+                             <span className="text-[10px] font-black text-gray-900 uppercase truncate max-w-[120px]">{tech.name}</span>
+                           </div>
+                           <div className="flex items-center gap-2">
+                             {!tech.isActive && (
+                               <span className="text-[7px] font-black text-red-600 bg-red-100 px-2 py-0.5 rounded-lg uppercase tracking-tighter">
+                                 {tech.leaveType || 'Libre'}
+                               </span>
+                             )}
+                             <span className={`text-[7px] font-black uppercase tracking-widest ${tech.isActive ? 'text-green-600' : 'text-red-400'}`}>
+                               {tech.isActive ? 'Disponible' : 'No Disponible'}
+                             </span>
+                           </div>
                          </div>
                        ))}
                      </div>

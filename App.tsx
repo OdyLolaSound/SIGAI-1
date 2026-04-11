@@ -59,7 +59,8 @@ const App: React.FC = () => {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        storageService.startListeners();
+        storageService.startListeners(firebaseUser.uid);
+        
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
@@ -639,7 +640,11 @@ const App: React.FC = () => {
             <Zap className="w-12 h-12 text-yellow-400 animate-bounce mb-4" />
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Sincronizando con SIGAI Cloud...</p>
           </div>
-        ) : renderContent()}
+        ) : (
+          <div className="w-full">
+            {renderContent()}
+          </div>
+        )}
       </div>
       {showAuthModal && authRole && (
         <AuthModal 

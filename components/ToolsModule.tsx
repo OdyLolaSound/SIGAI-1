@@ -6,7 +6,7 @@ import {
   Layers, Move, RotateCcw, Info,
   ChevronRight, Calculator, Scaling, FileSpreadsheet, PlusCircle,
   FileCode, Home, CheckCircle, Target, Smartphone, Zap, Flame, Droplets,
-  Download, Plus, Cloud, FolderOpen, FileUp, FileDown
+  Download, Plus, Cloud, FolderOpen, FileUp, FileDown, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
@@ -27,9 +27,11 @@ import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 import * as THREE from 'three';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
+import PDFScannerTool from './PDFScannerTool';
+import PDFSignerTool from './PDFSignerTool';
 
-type CategoryType = 'menu' | 'medidas' | 'electricidad';
-type ToolType = 'none' | 'converter' | 'ar_measure' | 'scan_3d' | 'level' | 'panel_designer';
+type CategoryType = 'menu' | 'medidas' | 'electricidad' | 'oficina';
+type ToolType = 'none' | 'converter' | 'ar_measure' | 'scan_3d' | 'level' | 'panel_designer' | 'pdf_scanner' | 'pdf_signer';
 
 interface Point3D {
   x: number;
@@ -54,6 +56,10 @@ const ToolsModule: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           return <LevelTool onBack={() => setActiveTool('none')} />;
         case 'panel_designer':
           return <ElectricalPanelDesigner onBack={() => setActiveTool('none')} />;
+        case 'pdf_scanner':
+          return <PDFScannerTool onBack={() => setActiveTool('none')} />;
+        case 'pdf_signer':
+          return <PDFSignerTool onBack={() => setActiveTool('none')} />;
         default:
           return null;
       }
@@ -125,6 +131,35 @@ const ToolsModule: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </div>
           </div>
         );
+      case 'oficina':
+        return (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={() => setActiveCategory('menu')} className="p-3 bg-gray-100 rounded-2xl"><ArrowLeft className="w-5 h-5" /></button>
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tighter">Oficina y Documentos</h3>
+                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Gestión de archivos y escaneado</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              <ToolCard 
+                icon={<Camera className="w-6 h-6" />}
+                title="Scanner PDF"
+                desc="Escanea y endereza documentos"
+                onClick={() => setActiveTool('pdf_scanner')}
+                color="bg-emerald-50 border-emerald-100 text-emerald-900"
+              />
+              <ToolCard 
+                icon={<FileText className="w-6 h-6" />}
+                title="Firmar PDF"
+                desc="Añade tu firma a cualquier PDF"
+                onClick={() => setActiveTool('pdf_signer')}
+                color="bg-blue-50 border-blue-100 text-blue-900"
+              />
+            </div>
+          </div>
+        );
       default:
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -149,6 +184,13 @@ const ToolsModule: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 title="Electricidad"
                 desc="Diseño de cuadros y cálculos"
                 onClick={() => setActiveCategory('electricidad')}
+                color="bg-white border-gray-100"
+              />
+              <CategoryCard 
+                icon={<FileText className="w-6 h-6" />}
+                title="Oficina"
+                desc="Scanner PDF y documentos"
+                onClick={() => setActiveCategory('oficina')}
                 color="bg-white border-gray-100"
               />
             </div>

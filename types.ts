@@ -49,13 +49,28 @@ export type LeaveType =
   | 'RJ - REDUCCIÓN DE JORNADA'
   | 'Otro';
 
+export interface Approval {
+  userId: string;
+  userName: string;
+  status: 'pending' | 'approved' | 'rejected';
+  signature?: string; // Data URL
+  date?: string;
+}
+
 export interface LeaveEntry {
   id: string;
+  userId: string;
+  userName: string;
   type: LeaveType;
   startDate: string;
   endDate: string;
   notes?: string;
+  status: 'pending' | 'partially_approved' | 'approved' | 'rejected';
   createdAt: string;
+  requesterSignature?: string; // Data URL
+  approvers: string[]; // List of Oficina de Control IDs
+  approvals: Approval[];
+  pdfUrl?: string;
 }
 
 // --- WATER TELEMETRY TYPES (AGUAS DE ALICANTE) ---
@@ -195,13 +210,6 @@ export interface CalendarTask {
   recurrence?: 'No' | 'Diaria' | 'Semanal' | 'Mensual';
   reminder?: string[];
   checklist?: ChecklistItem[];
-  whatsappNotification?: {
-    enabled: boolean;
-    notifyAt: string; // ISO date string
-    phoneNumber?: string;
-    sent?: boolean;
-    error?: string;
-  };
   createdBy: string;
   createdAt: string;
 }
@@ -230,7 +238,7 @@ export interface AppNotification {
   userId: string;
   title: string;
   message: string;
-  type: 'system' | 'task_assigned' | 'task_overdue' | 'task_completed';
+  type: 'system' | 'task_assigned' | 'task_overdue' | 'task_completed' | 'alert' | 'today_summary';
   read: boolean;
   date: string;
   relatedId?: string;

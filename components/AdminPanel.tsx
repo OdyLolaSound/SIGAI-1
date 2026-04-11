@@ -55,7 +55,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
   };
 
   const saveApproval = (userId: string) => {
-    storageService.updateUserStatus(userId, 'approved', tempBuildings, tempUnits, tempCategory);
+    const isTécnico = tempCategory === 'Técnico';
+    storageService.updateUserStatus(userId, 'approved', tempBuildings, tempUnits, tempCategory, isTécnico);
     setUsers(storageService.getUsers());
     setEditingUserId(null);
   };

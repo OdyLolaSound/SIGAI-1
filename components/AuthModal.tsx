@@ -97,10 +97,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
         password: '', // Don't store plain password in Firestore
         role: formData.username.toLowerCase() === 'admin' ? 'MASTER' : formData.role,
         status: formData.username.toLowerCase() === 'admin' ? 'approved' : 'pending',
+        userCategory: formData.username.toLowerCase() === 'admin' ? 'Oficina de Control' : 'Técnico',
         assignedBuildings: [],
         assignedUnits: formData.username.toLowerCase() === 'admin' ? ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] : [formData.role],
         phone: formData.phone,
-        isManto: formData.username.toLowerCase() === 'admin' ? true : formData.isManto,
+        isManto: true,
         leaveDays: []
       };
 
@@ -193,7 +194,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
                     phone: formData.phone,
                     role: formData.role,
                     specialty: formData.specialty,
-                    assignedUnits: [formData.role]
+                    assignedUnits: [formData.role],
+                    userCategory: 'Técnico',
+                    isManto: true
                   }, { merge: true });
                   setView('pending');
                 } catch (e) {
