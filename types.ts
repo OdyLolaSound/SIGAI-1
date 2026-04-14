@@ -1,7 +1,7 @@
 
 export type Role = 'USAC' | 'CG' | 'GCG' | 'GOE3' | 'GOE4' | 'BOEL' | 'UMOE' | 'CECOM' | 'MASTER';
 export type UserStatus = 'pending' | 'approved' | 'rejected';
-export type ServiceType = 'luz' | 'agua' | 'caldera' | 'peticion' | 'material' | 'gasoil' | 'sal' | 'temperatura' | 'mantenimiento';
+export type ServiceType = 'luz' | 'agua' | 'caldera' | 'peticion' | 'material' | 'gasoil' | 'sal' | 'temperatura' | 'mantenimiento' | 'oca';
 export type ReadingOrigin = 'manual' | 'telematica' | 'ai';
 export type RequestCategory = 'Eléctrico' | 'Fontanería' | 'Calderas / Climatización' | 'Carpintería / Cerraduras' | 'Mobiliario' | 'Informática' | 'Otros' | 'Logística / Almacén' | 'Combustible';
 export type UrgencyLevel = 'Baja' | 'Media' | 'Alta' | 'Crítica' | 'Rutina';
@@ -324,7 +324,10 @@ export enum AppTab {
   TEMPERATURES = 'temperatures',
   MAINTENANCE = 'maintenance',
   WATER_SYNC = 'water_sync',
-  TOOLS = 'tools'
+  TOOLS = 'tools',
+  BLUEPRINTS = 'blueprints',
+  PPTS = 'ppts',
+  OCA = 'oca'
 }
 
 export interface Reading {
@@ -356,7 +359,7 @@ export interface RequestItem {
   urgency?: UrgencyLevel;
   title: string;
   description: string;
-  status: 'open' | 'in_progress' | 'returned' | 'closed' | 'resolved_by_ai' | 'borrador' | 'pendiente' | 'aprobada' | 'rechazada' | 'pedida' | 'recibida_parcial' | 'recibida' | 'cancelada';
+  status: 'open' | 'in_progress' | 'returned' | 'closed' | 'resolved_by_ai' | 'borrador' | 'pendiente' | 'aprobada' | 'rechazada' | 'pedida' | 'recibida_parcial' | 'recibida' | 'cancelada' | 'asignada';
   date: string;
   resolvedAt?: string;
   imageUrl?: string;
@@ -369,6 +372,8 @@ export interface RequestItem {
   };
   isChronic?: boolean;
   structuralSolution?: string;
+  assignedTechnicians?: string[];
+  acceptanceStatus?: Record<string, 'pending' | 'accepted' | 'rejected'>;
   workDetails?: {
     workPerformed: string;
     materialsUsed: string;
@@ -417,6 +422,16 @@ export interface MaterialItem {
   needsRequest?: boolean;
 }
 
+export interface ProviderDocument {
+  id: string;
+  name: string;
+  type: 'Presupuesto' | 'Factura' | 'Albarán' | 'Contrato' | 'Otro';
+  date: string;
+  content: string; // Base64
+  fileType: string; // mime type
+  notes?: string;
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -446,6 +461,7 @@ export interface Provider {
   status: 'activo' | 'inactivo';
   notes?: string;
   createdAt: string;
+  documents?: ProviderDocument[];
 }
 
 export interface MaterialCategory {
@@ -463,4 +479,58 @@ export interface Building {
   code: string;
   unit: Exclude<Role, 'MASTER'>;
   hasBoiler: boolean;
+}
+
+export interface Blueprint {
+  id: string;
+  buildingId: string;
+  name: string;
+  type: 'PDF' | 'DWG' | 'IMG' | 'DOC';
+  url: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  notes?: string;
+}
+
+export interface PPT {
+  id: string;
+  title: string;
+  category: 'Ascensores' | 'Centros de Transformación' | 'Legionella' | 'Térmicas' | 'Piscinas' | 'Jardinería' | 'Otros';
+  companyId?: string;
+  companyName?: string;
+  validFrom: string;
+  validTo: string;
+  documentUrl?: string;
+  tasks: PPTTask[];
+  status: 'active' | 'expired' | 'pending_review';
+  createdAt: string;
+}
+
+export interface PPTTask {
+  id: string;
+  description: string;
+  frequency: 'diaria' | 'semanal' | 'mensual' | 'trimestral' | 'semestral' | 'anual' | 'bienal' | 'otros';
+  lastExecution?: string;
+  nextExecution?: string;
+  priority: UrgencyLevel;
+  notes?: string;
+}
+
+export interface OCACertificate {
+  id: string;
+  title: string;
+  category: 'Baja Tensión' | 'Alta Tensión' | 'Equipos a Presión' | 'Ascensores' | 'Incendios' | 'Legionella' | 'Otros';
+  buildingId: string;
+  buildingName: string;
+  lastInspectionDate: string;
+  expirationDate: string;
+  periodicityYears: number;
+  status: 'vigente' | 'expirando' | 'caducado' | 'pendiente_presupuesto';
+  companyId?: string;
+  companyName?: string;
+  notes?: string;
+  documentUrl?: string;
+  budgetRequested?: boolean;
+  budgetReceived?: boolean;
+  budgetAmount?: number;
 }

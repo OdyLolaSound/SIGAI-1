@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, Camera, Loader2, Check, AlertTriangle, 
   Save, Phone, Mail, MapPin, Globe, Tag, 
-  Star, ShieldCheck, Info, RefreshCw
+  Star, ShieldCheck, Info, RefreshCw,
+  FileText, Upload, Trash2, Download, Plus
 } from 'lucide-react';
-import { Provider, MaterialCategory } from '../types';
+import { Provider, MaterialCategory, ProviderDocument } from '../types';
 import { storageService } from '../services/storageService';
 import { extractProviderInfo } from '../services/geminiService';
 
@@ -30,9 +31,11 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ onClose, onSave, initialDat
   });
 
   const [scanning, setScanning] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const [duplicate, setDuplicate] = useState<Provider | null>(null);
   const [categorias, setCategorias] = useState<MaterialCategory[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCategorias(storageService.getCategories());
@@ -79,6 +82,54 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ onClose, onSave, initialDat
     }
   };
 
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDoc(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      const newDoc: ProviderDocument = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        type: 'Presupuesto',
+        date: new Date().toISOString(),
+        content: base64,
+        fileType: file.type
+      };
+      setFormData(prev => ({
+        ...prev,
+        documents: [...(prev.documents || []), newDoc]
+      }));
+      setUploadingDoc(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeDoc = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      documents: (prev.documents || []).filter(d => d.id !== id)
+    }));
+  };
+
+  const updateDocType = (id: string, type: ProviderDocument['type']) => {
+    setFormData(prev => ({
+      ...prev,
+      documents: (prev.documents || []).map(d => d.id === id ? { ...d, type } : d)
+    }));
+  };
+
+  const downloadDoc = (doc: ProviderDocument) => {
+    const link = document.createElement('a');
+    link.href = doc.content;
+    link.download = doc.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return;
@@ -100,7 +151,8 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ onClose, onSave, initialDat
       deliveryTimeDays: duplicate?.deliveryTimeDays || 2,
       doesShipping: duplicate?.doesShipping || true,
       status: 'activo',
-      createdAt: duplicate?.createdAt || new Date().toISOString()
+      createdAt: duplicate?.createdAt || new Date().toISOString(),
+      documents: formData.documents || []
     };
 
     if (duplicate) {
@@ -327,6 +379,84 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ onClose, onSave, initialDat
               >
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.isPreferred ? 'left-7' : 'left-1'}`} />
               </button>
+            </div>
+
+            {/* Documents Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  <h6 className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Documentos y Presupuestos</h6>
+                </div>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  ref={docInputRef}
+                  onChange={handleDocUpload}
+                />
+                <button 
+                  type="button"
+                  onClick={() => docInputRef.current?.click()}
+                  disabled={uploadingDoc}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all"
+                >
+                  {uploadingDoc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                  Añadir Archivo
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {(!formData.documents || formData.documents.length === 0) ? (
+                  <div className="p-8 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100 text-center">
+                    <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">No hay documentos guardados</p>
+                  </div>
+                ) : (
+                  formData.documents.map(doc => (
+                    <div key={doc.id} className="bg-white border border-gray-100 p-4 rounded-2xl flex items-center justify-between group hover:border-blue-200 transition-all">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black text-gray-900 uppercase truncate" title={doc.name}>{doc.name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <select 
+                              value={doc.type}
+                              onChange={(e) => updateDocType(doc.id, e.target.value as any)}
+                              className="text-[8px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase outline-none"
+                            >
+                              <option value="Presupuesto">Presupuesto</option>
+                              <option value="Factura">Factura</option>
+                              <option value="Albarán">Albarán</option>
+                              <option value="Contrato">Contrato</option>
+                              <option value="Otro">Otro</option>
+                            </select>
+                            <span className="text-[8px] font-bold text-gray-300 uppercase">{new Date(doc.date).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          type="button"
+                          onClick={() => downloadDoc(doc)}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Descargar"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => removeDoc(doc.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
             <button 

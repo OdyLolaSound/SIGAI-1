@@ -5,6 +5,7 @@ import { CalendarTask, User as UserType, UrgencyLevel, ChecklistItem, ExternalUs
 import { storageService } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
 import { GoogleGenAI } from "@google/genai";
+import { motion, AnimatePresence } from 'motion/react';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -42,6 +43,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [suggestedChecklist, setSuggestedChecklist] = useState<ChecklistItem[] | null>(null);
   
   // External Logic
   const [showExternalModal, setShowExternalModal] = useState(false);
@@ -59,6 +61,43 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
       setFormData(task);
     }
   }, [task]);
+
+  // Similarity Detection
+  useEffect(() => {
+    if (task || !formData.title || formData.title.length < 4) {
+      setSuggestedChecklist(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const allTasks = storageService.getTasks();
+      const normalizedTitle = formData.title!.toLowerCase().trim();
+      
+      const similar = allTasks.find(t => {
+        const tTitle = t.title.toLowerCase().trim();
+        return (tTitle === normalizedTitle || tTitle.includes(normalizedTitle) || normalizedTitle.includes(tTitle)) 
+               && t.checklist && t.checklist.length > 0;
+      });
+
+      if (similar && (!formData.checklist || formData.checklist.length === 0)) {
+        setSuggestedChecklist(similar.checklist);
+      } else {
+        setSuggestedChecklist(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formData.title, task, formData.checklist]);
+
+  const applySuggestedChecklist = () => {
+    if (suggestedChecklist) {
+      setFormData(prev => ({
+        ...prev,
+        checklist: suggestedChecklist.map(item => ({ ...item, id: crypto.randomUUID(), completed: false }))
+      }));
+      setSuggestedChecklist(null);
+    }
+  };
 
   const handleSave = async () => {
     let finalTitle = formData.title?.trim();
@@ -399,6 +438,33 @@ const TaskForm: React.FC<TaskFormProps> = ({ user, initialDate, task, onClose })
           {/* Checklist */}
           <div className="space-y-3">
              <label className="text-[9px] font-black uppercase text-gray-400 px-2 tracking-widest">Procedimiento / Checklist</label>
+             
+             {/* Sugerencia de Checklist */}
+             <AnimatePresence>
+               {suggestedChecklist && (
+                 <motion.div 
+                   initial={{ opacity: 0, height: 0 }}
+                   animate={{ opacity: 1, height: 'auto' }}
+                   exit={{ opacity: 0, height: 0 }}
+                   className="overflow-hidden"
+                 >
+                   <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-3 space-y-3">
+                     <div className="flex items-center gap-2 text-yellow-700">
+                       <AlertTriangle className="w-4 h-4" />
+                       <span className="text-[9px] font-black uppercase tracking-tight">Tarea similar detectada</span>
+                     </div>
+                     <p className="text-[10px] text-yellow-800 font-bold">¿Quieres importar las {suggestedChecklist.length} subtareas de una tarea anterior similar?</p>
+                     <button 
+                       onClick={applySuggestedChecklist}
+                       className="w-full py-2 bg-yellow-400 text-black rounded-xl font-black uppercase text-[8px] tracking-widest shadow-sm active:scale-95 transition-all"
+                     >
+                       Importar Procedimiento
+                     </button>
+                   </div>
+                 </motion.div>
+               )}
+             </AnimatePresence>
+
              <div className="bg-gray-50 p-4 rounded-[2.5rem] border border-gray-100 space-y-3">
                 {formData.checklist?.map(item => (
                   <div key={item.id} className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl shadow-sm">

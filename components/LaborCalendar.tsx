@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, X, Trash2, AlertCircle, User as UserIcon, CheckCircle2, Clock, FileText, Download, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, X, Trash2, AlertCircle, User as UserIcon, CheckCircle2, Clock, FileText, Download, ShieldCheck, MessageSquare } from 'lucide-react';
 import { User, LeaveType, LeaveEntry, Approval } from '../types';
 import { storageService } from '../services/storageService';
 import { getLocalDateString, isHoliday } from '../services/dateUtils';
@@ -47,6 +47,7 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<LeaveEntry[]>([]);
   const [signingApprovalId, setSigningApprovalId] = useState<string | null>(null);
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
 
   const isTecnico = user.userCategory === 'Técnico';
   const isOficina = user.userCategory === 'Oficina de Control' || user.role === 'MASTER';
@@ -104,7 +105,7 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
 
   const handleAddLeave = () => {
     if (!startDate) return;
-    if (isTecnico && selectedApprovers.length < 2) {
+    if (selectedApprovers.length < 2) {
       alert("Debes seleccionar 2 usuarios de Oficina de Control para la aprobación.");
       return;
     }
@@ -114,7 +115,7 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
   const submitLeaveRequest = async (signature: string) => {
     const finalEndDate = endDate || startDate;
     const newEntry: LeaveEntry = {
-      id: crypto.randomUUID(),
+      id: editingRequestId || crypto.randomUUID(),
       userId: user.id,
       userName: user.name,
       type: selectedType,
@@ -135,8 +136,8 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
       storageService.addNotification({
         id: crypto.randomUUID(),
         userId: approverId,
-        title: 'Nueva Solicitud de Permiso',
-        message: `${user.name} ha solicitado un permiso de ${selectedType}.`,
+        title: editingRequestId ? 'Solicitud de Permiso Modificada' : 'Nueva Solicitud de Permiso',
+        message: `${user.name} ha ${editingRequestId ? 'modificado' : 'solicitado'} un permiso de ${selectedType}.`,
         type: 'system',
         read: false,
         date: new Date().toISOString(),
@@ -150,6 +151,7 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
     setSelectedApprovers([]);
     setShowSignaturePad(false);
     setIsAdding(false);
+    setEditingRequestId(null);
   };
 
   const handleApprove = (requestId: string) => {
@@ -274,10 +276,35 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
   };
 
   const handleRemoveEntry = async (entryId: string) => {
-    // Logic to remove from leave_requests collection
-    // For now we'll just implement it as a delete in storageService
-    // (I'll add deleteLeaveRequest to storageService in a moment)
-    await storageService.deleteLeaveRequest(entryId);
+    if (window.confirm('¿Estás seguro de que deseas eliminar esta solicitud?')) {
+      await storageService.deleteLeaveRequest(entryId);
+    }
+  };
+
+  const handleEditEntry = (entry: LeaveEntry) => {
+    setEditingRequestId(entry.id);
+    setStartDate(entry.startDate);
+    setEndDate(entry.endDate);
+    setSelectedType(entry.type);
+    setNotes(entry.notes || '');
+    setSelectedApprovers(entry.approvers || []);
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleNotifyWhatsApp = (entry: LeaveEntry, approverId: string) => {
+    const approver = storageService.getUsers().find(u => u.id === approverId);
+    if (!approver || !approver.phone) {
+      alert("Este responsable no tiene configurado su número de teléfono en su perfil.");
+      return;
+    }
+    
+    const phone = approver.phone.replace(/\+/g, '').replace(/\s/g, '');
+    const dates = entry.startDate === entry.endDate ? entry.startDate : `del ${entry.startDate} al ${entry.endDate}`;
+    const appUrl = window.location.origin;
+    const message = `🔔 *SIGAI USAC: Firma Pendiente*\n\nHola ${approver.name.split(' ')[0]}, tienes una solicitud de permiso pendiente de tu firma.\n\n*Solicitante:* ${user.name}\n*Tipo:* ${entry.type}\n*Fechas:* ${dates}\n\n👉 *Firma aquí:* ${appUrl}\n\nGracias.`;
+    
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const isInRange = (dateStr: string) => {
@@ -394,13 +421,15 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
         <div className="bg-gray-900 text-white rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-4">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h5 className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-1">Nuevo Permiso</h5>
+              <h5 className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-1">
+                {editingRequestId ? 'Modificar Solicitud' : 'Nuevo Permiso'}
+              </h5>
               <p className="text-lg font-black uppercase tracking-tight">
                 {endDate ? `Del ${new Date(startDate).getDate()} al ${new Date(endDate).getDate()}` : `Día ${new Date(startDate).getDate()}`}
                 <span className="text-xs text-gray-400 ml-2">de {new Date(startDate).toLocaleString('es-ES', { month: 'long' })}</span>
               </p>
             </div>
-            <button onClick={() => { setStartDate(null); setEndDate(null); }} className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
+            <button onClick={() => { setStartDate(null); setEndDate(null); setEditingRequestId(null); }} className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -431,35 +460,33 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
               </div>
             )}
 
-            {/* Selección de Aprobadores (Solo para Técnicos) */}
-            {isTecnico && (
-              <div className="space-y-3">
-                <label className="text-[8px] font-black uppercase tracking-widest text-gray-500 block px-1">Seleccionar 2 Responsables (Oficina de Control)</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {oficinaUsers.map(oficina => (
-                    <button
-                      key={oficina.id}
-                      onClick={() => toggleApprover(oficina.id)}
-                      className={`p-3 rounded-xl border-2 transition-all flex items-center gap-2 ${selectedApprovers.includes(oficina.id) ? 'bg-yellow-400 border-yellow-400 text-black' : 'bg-white/5 border-white/10 text-white/40'}`}
-                    >
-                      <UserIcon className="w-3 h-3" />
-                      <span className="text-[9px] font-black uppercase truncate">{oficina.name.split(' ')[0]}</span>
-                    </button>
-                  ))}
-                </div>
-                {selectedApprovers.length < 2 && (
-                  <p className="text-[7px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1">
-                    <AlertCircle className="w-2 h-2" /> Faltan {2 - selectedApprovers.length} responsables
-                  </p>
-                )}
+            {/* Selección de Aprobadores (Obligatorio para todos) */}
+            <div className="space-y-3">
+              <label className="text-[8px] font-black uppercase tracking-widest text-gray-500 block px-1">Seleccionar 2 Responsables (Oficina de Control)</label>
+              <div className="grid grid-cols-2 gap-2">
+                {oficinaUsers.map(oficina => (
+                  <button
+                    key={oficina.id}
+                    onClick={() => toggleApprover(oficina.id)}
+                    className={`p-3 rounded-xl border-2 transition-all flex items-center gap-2 ${selectedApprovers.includes(oficina.id) ? 'bg-yellow-400 border-yellow-400 text-black' : 'bg-white/5 border-white/10 text-white/40'}`}
+                  >
+                    <UserIcon className="w-3 h-3" />
+                    <span className="text-[9px] font-black uppercase truncate">{oficina.name.split(' ')[0]}</span>
+                  </button>
+                ))}
               </div>
-            )}
+              {selectedApprovers.length < 2 && (
+                <p className="text-[7px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1">
+                  <AlertCircle className="w-2 h-2" /> Faltan {2 - selectedApprovers.length} responsables
+                </p>
+              )}
+            </div>
 
             <button 
               onClick={handleAddLeave}
               className="w-full p-5 bg-yellow-400 text-black rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              <Plus className="w-4 h-4" /> {isTecnico ? 'Solicitar y Firmar' : 'Registrar Permiso'}
+              <Plus className="w-4 h-4" /> {editingRequestId ? 'Guardar Cambios y Re-firmar' : 'Solicitar y Firmar'}
             </button>
           </div>
         </div>
@@ -497,9 +524,40 @@ const LaborCalendar: React.FC<LaborCalendarProps> = ({ user, onUpdate }) => {
                     <div className="text-xs font-black text-gray-500 uppercase tracking-tight">
                       {entry.startDate === entry.endDate ? entry.startDate : `Del ${entry.startDate} al ${entry.endDate}`}
                     </div>
+                    
+                    {/* Botones de notificación WhatsApp para responsables pendientes */}
+                    {(entry.status === 'pending' || entry.status === 'partially_approved') && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {entry.approvers.map(approverId => {
+                          const hasSigned = entry.approvals.some(a => a.userId === approverId);
+                          if (hasSigned) return null;
+                          const approver = storageService.getUsers().find(u => u.id === approverId);
+                          return (
+                            <button
+                              key={approverId}
+                              onClick={() => handleNotifyWhatsApp(entry, approverId)}
+                              className="flex items-center gap-1.5 px-2 py-1 bg-green-50 text-green-600 rounded-lg border border-green-100 hover:bg-green-100 transition-all active:scale-95"
+                              title={`Notificar a ${approver?.name || 'Responsable'} por WhatsApp`}
+                            >
+                              <MessageSquare className="w-2.5 h-2.5" />
+                              <span className="text-[7px] font-black uppercase tracking-tighter">Avisar a {approver?.name.split(' ')[0]}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  {entry.status === 'pending' && (
+                    <button 
+                      onClick={() => handleEditEntry(entry)}
+                      className="p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                      title="Editar Solicitud"
+                    >
+                      <FileText className="w-4 h-4" />
+                    </button>
+                  )}
                   {entry.status === 'approved' && (
                     <button 
                       onClick={() => generatePDF(entry)}

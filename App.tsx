@@ -20,8 +20,12 @@ import MaintenanceModule from './components/MaintenanceModule';
 import WaterSyncModule from './components/WaterSyncModule';
 import ToolsModule from './components/ToolsModule';
 import LaborCalendar from './components/LaborCalendar';
+import OCAModule from './components/OCAModule';
+import PPTModule from './components/PPTModule';
+import BlueprintsModule from './components/BlueprintsModule';
+import VoiceAssistant from './components/VoiceAssistant';
 import { AppTab, ServiceType, Building, User, Role } from './types';
-import { Zap, Droplets, Flame, ShieldCheck, ChevronRight, User as UserIcon, LogOut, Crown, PlusCircle, LayoutGrid, UserPlus, MessageSquare, Package, ClipboardList, Calendar, Users, Bell, Phone, CheckCircle, Info } from 'lucide-react';
+import { Zap, Droplets, Flame, ShieldCheck, ChevronRight, User as UserIcon, LogOut, Crown, PlusCircle, LayoutGrid, UserPlus, MessageSquare, Package, ClipboardList, Calendar, Users, Bell, Phone, CheckCircle, Info, Mic } from 'lucide-react';
 import { storageService, BUILDINGS } from './services/storageService';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -52,6 +56,7 @@ const App: React.FC = () => {
     return (localStorage.getItem('sigai_active_unit') as Role) || null;
   });
   const [isSyncing, setIsSyncing] = useState(true);
+  const [showVoiceAssistant, setShowVoiceAssistant] = useState(false);
 
   useEffect(() => {
     // Initialize storage immediately
@@ -69,16 +74,16 @@ const App: React.FC = () => {
             storageService.setCurrentUser(userData);
           } else {
             // If it's the master admin (email check)
-            if (firebaseUser.email === 'JCYebenes@gmail.com') {
+            if (firebaseUser.email === 'JCYebenes@gmail.com' || firebaseUser.email === 'jyebavi@sigai.local') {
               const masterUser: User = {
                 id: firebaseUser.uid,
-                name: 'Administrador Maestro',
-                username: 'admin',
+                name: firebaseUser.email === 'jyebavi@sigai.local' ? 'Jyebavi' : 'Administrador Maestro',
+                username: firebaseUser.email === 'jyebavi@sigai.local' ? 'jyebavi' : 'admin',
                 password: '', // No password needed for OAuth/Firebase Auth
                 role: 'MASTER',
                 status: 'approved',
                 assignedBuildings: BUILDINGS.map(b => b.id),
-                assignedUnits: ['USAC', 'GCG', 'BOEL', 'GOE4'],
+                assignedUnits: ['USAC', 'GCG', 'BOEL', 'GOE4', 'CG', 'GOE3', 'UMOE', 'CECOM'],
                 isManto: true,
                 leaveDays: []
               };
@@ -364,6 +369,10 @@ const App: React.FC = () => {
       return <WaterSyncModule user={currentUser} onNavigate={setActiveTab} />;
     }
 
+    if (activeTab === AppTab.BLUEPRINTS && currentUser?.role === 'MASTER') return <BlueprintsModule user={currentUser} />;
+    if (activeTab === AppTab.PPTS && currentUser?.role === 'MASTER') return <PPTModule user={currentUser} />;
+    if (activeTab === AppTab.OCA && currentUser?.role === 'MASTER') return <OCAModule />;
+
     if (activeTab === AppTab.TOOLS) {
       return <ToolsModule onBack={() => { setActiveTab(AppTab.HOME); setUnitMenuOpen(true); }} />;
     }
@@ -409,14 +418,14 @@ const App: React.FC = () => {
           </div>
           
           <div className="grid grid-cols-2 gap-4 w-full px-2">
-            {(!currentUser || currentUser.assignedUnits?.includes('USAC')) && <UnitButton icon="🏢" label='USAC "Rojas Navarrete"' onClick={() => handleUnitClick('USAC')} full />}
-            {(!currentUser || currentUser.assignedUnits?.includes('CG')) && <UnitButton icon="🏛️" label="Cuartel General" onClick={() => handleUnitClick('CG')} />}
-            {(!currentUser || currentUser.assignedUnits?.includes('GCG')) && <UnitButton icon="👥" label="Grupo C. General" onClick={() => handleUnitClick('GCG')} />}
-            {(!currentUser || currentUser.assignedUnits?.includes('GOE3')) && <UnitButton icon="⚔️" label="GOE III" onClick={() => handleUnitClick('GOE3')} />}
-            {(!currentUser || currentUser.assignedUnits?.includes('GOE4')) && <UnitButton icon="⚔️" label="GOE IV" onClick={() => handleUnitClick('GOE4')} />}
-            {(!currentUser || currentUser.assignedUnits?.includes('BOEL')) && <UnitButton icon="🦅" label="BOEL XIX" onClick={() => handleUnitClick('BOEL')} />}
-            {(!currentUser || currentUser.assignedUnits?.includes('UMOE')) && <UnitButton icon="🎖️" label="UMOE" onClick={() => handleUnitClick('UMOE')} />}
-            {(!currentUser || currentUser.assignedUnits?.includes('CECOM')) && <UnitButton icon="📡" label="CECOM" onClick={() => handleUnitClick('CECOM')} />}
+            {currentUser?.assignedUnits?.includes('USAC') && <UnitButton icon="🏢" label='USAC "Rojas Navarrete"' onClick={() => handleUnitClick('USAC')} full />}
+            {currentUser?.assignedUnits?.includes('CG') && <UnitButton icon="🏛️" label="Cuartel General" onClick={() => handleUnitClick('CG')} />}
+            {currentUser?.assignedUnits?.includes('GCG') && <UnitButton icon="👥" label="Grupo C. General" onClick={() => handleUnitClick('GCG')} />}
+            {currentUser?.assignedUnits?.includes('GOE3') && <UnitButton icon="⚔️" label="GOE III" onClick={() => handleUnitClick('GOE3')} />}
+            {currentUser?.assignedUnits?.includes('GOE4') && <UnitButton icon="⚔️" label="GOE IV" onClick={() => handleUnitClick('GOE4')} />}
+            {currentUser?.assignedUnits?.includes('BOEL') && <UnitButton icon="🦅" label="BOEL XIX" onClick={() => handleUnitClick('BOEL')} />}
+            {currentUser?.assignedUnits?.includes('UMOE') && <UnitButton icon="🎖️" label="UMOE" onClick={() => handleUnitClick('UMOE')} />}
+            {currentUser?.assignedUnits?.includes('CECOM') && <UnitButton icon="📡" label="CECOM" onClick={() => handleUnitClick('CECOM')} />}
           </div>
 
           <div className="w-full px-2 mt-8 space-y-4">
@@ -458,7 +467,7 @@ const App: React.FC = () => {
       
       // Filter for Luz specific sites if service is Luz
       if (selectedService === 'luz') {
-        visibleBuildings = BUILDINGS.filter(b => b.id === 'CT_1_2' || b.id === 'CT_3');
+        visibleBuildings = BUILDINGS.filter(b => b.id === 'CT_1_2' || b.id === 'CT_3' || b.id === 'BASE_ALICANTE');
       }
 
       return (
@@ -646,6 +655,34 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Voice Assistant Trigger */}
+      {currentUser && activeTab === AppTab.HOME && !selectedService && !unitMenuOpen && (
+        <button 
+          onClick={() => setShowVoiceAssistant(true)}
+          className="fixed bottom-10 right-6 w-14 h-14 bg-gray-900 text-yellow-400 rounded-2xl shadow-2xl flex items-center justify-center active:scale-90 transition-all z-50 border-2 border-yellow-400/20"
+        >
+          <Mic className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Voice Assistant Modal */}
+      <VoiceAssistant 
+        user={currentUser}
+        isOpen={showVoiceAssistant} 
+        onClose={() => setShowVoiceAssistant(false)} 
+        onNavigate={(tab) => {
+          setActiveTab(tab);
+          if (tab === AppTab.HOME) {
+            setUnitMenuOpen(false);
+            setSelectedService(null);
+            setSelectedBuilding(null);
+          } else {
+            setUnitMenuOpen(true);
+          }
+        }} 
+      />
+
       {showAuthModal && authRole && (
         <AuthModal 
           initialRole={authRole} 

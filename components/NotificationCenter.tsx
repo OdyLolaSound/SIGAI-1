@@ -85,9 +85,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onClose
                <p className="text-[10px] font-black uppercase tracking-widest">Sin notificaciones</p>
             </div>
           ) : (
-            notifications.map(n => (
+            notifications.map((n, idx) => (
               <div 
-                key={n.id} 
+                key={`${n.id}-${idx}`} 
                 onClick={() => {
                   handleMarkRead(n.id);
                   if (n.relatedId) onTaskClick(n.relatedId);

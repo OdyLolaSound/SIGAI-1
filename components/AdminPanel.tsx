@@ -15,7 +15,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingDetailsId, setEditingDetailsId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', phone: '', username: '' });
+  const [editForm, setEditForm] = useState({ name: '', phone: '', username: '', userCategory: undefined as UserCategory | undefined });
   const [tempBuildings, setTempBuildings] = useState<string[]>([]);
   const [tempUnits, setTempUnits] = useState<Role[]>([]);
   const [tempCategory, setTempCategory] = useState<UserCategory | undefined>(undefined);
@@ -95,21 +95,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     setEditForm({
       name: user.name,
       phone: user.phone || '',
-      username: user.username
+      username: user.username,
+      userCategory: user.userCategory
     });
   };
 
-  const saveDetails = (userId: string) => {
+  const saveDetails = async (userId: string) => {
     const user = users.find(u => u.id === userId);
     if (user) {
-      const updatedUser = {
+      const updatedUser: User = {
         ...user,
         name: editForm.name,
         phone: editForm.phone,
-        username: editForm.username
+        username: editForm.username,
+        userCategory: editForm.userCategory,
+        isManto: editForm.userCategory === 'Técnico'
       };
-      storageService.updateUser(updatedUser);
-      setUsers(storageService.getUsers());
+      await storageService.updateUser(updatedUser);
       setEditingDetailsId(null);
     }
   };
@@ -197,6 +199,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                           className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold text-gray-900 outline-none focus:border-tactical-orange"
                           placeholder="Teléfono"
                         />
+                        <select
+                          value={editForm.userCategory || ''}
+                          onChange={e => setEditForm({...editForm, userCategory: e.target.value as any})}
+                          className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold text-gray-900 outline-none focus:border-tactical-orange"
+                        >
+                          <option value="">Sin Categoría</option>
+                          <option value="Oficina de Control">Oficina de Control</option>
+                          <option value="Técnico">Técnico</option>
+                        </select>
                         <div className="flex gap-2">
                           <button onClick={() => saveDetails(user.id)} className="flex-1 p-2 bg-tactical-emerald text-black rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1 shadow-lg shadow-tactical-emerald/20">
                             <Save className="w-3 h-3" /> Guardar

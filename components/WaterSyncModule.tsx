@@ -454,8 +454,8 @@ const WaterSyncModule: React.FC<WaterSyncModuleProps> = ({ user, onNavigate }) =
 
          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             <div className="divide-y divide-gray-50">
-               {readings.slice(0, 7).map(r => (
-                  <div key={r.id} className={`p-5 flex items-center justify-between group transition-all ${r.isPeak ? 'bg-red-50/50' : 'hover:bg-gray-50'}`}>
+               {readings.slice(0, 7).map((r, idx) => (
+                  <div key={`${r.id}-${idx}`} className={`p-5 flex items-center justify-between group transition-all ${r.isPeak ? 'bg-red-50/50' : 'hover:bg-gray-50'}`}>
                      <div className="flex items-center gap-4">
                         <div className={`p-2.5 rounded-2xl flex items-center justify-center shrink-0 ${r.isPeak ? 'bg-red-100 text-red-600' : r.origin === 'telematica' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
                            {r.isPeak ? <AlertTriangle className="w-4 h-4 animate-bounce" /> : r.origin === 'telematica' ? <Globe className="w-4 h-4" /> : <Keyboard className="w-4 h-4" />}

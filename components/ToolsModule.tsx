@@ -336,6 +336,7 @@ const Step: React.FC<{ num: string, text: string }> = ({ num, text }) => (
 const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [points, setPoints] = useState<{ x: number, y: number, angle: { beta: number, gamma: number } }[]>([]);
   const [currentAngle, setCurrentAngle] = useState({ beta: 0, gamma: 0 });
@@ -350,7 +351,10 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       window.addEventListener('deviceorientation', handleOrientation);
     }
     return () => {
-      if (stream) stream.getTracks().forEach(t => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
       window.removeEventListener('deviceorientation', handleOrientation);
     };
   }, [showIntro]);
@@ -371,17 +375,37 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const startCamera = async () => {
     try {
       setError(null);
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("El navegador no soporta el acceso a la cámara.");
+      
+      if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+        throw new Error("La cámara requiere una conexión segura (HTTPS).");
       }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("El navegador no soporta el acceso a la cámara o está bloqueado.");
+      }
+
       const constraints = { 
-        video: { facingMode: 'environment' },
+        video: { 
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false 
       };
-      const s = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      let s;
+      try {
+        s = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e) {
+        console.warn("Fallo con ideal, intentando básico", e);
+        s = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      
       setStream(s);
+      streamRef.current = s;
     } catch (err) {
-      setError("Error de cámara. Asegúrate de dar permisos y usar HTTPS.");
+      console.error("Error de cámara:", err);
+      setError(`Error de cámara: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -568,6 +592,31 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           muted
           className="absolute inset-0 w-full h-full object-cover"
         />
+
+        {error && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-8 max-w-xs text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                <Camera className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-tighter text-gray-900">Error de Cámara</h3>
+              <p className="text-sm text-gray-500 font-medium leading-relaxed">{error}</p>
+              <button 
+                onClick={startCamera}
+                className="w-full p-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-all"
+              >
+                Reintentar
+              </button>
+              <button 
+                onClick={onBack}
+                className="w-full p-4 bg-gray-100 text-gray-600 rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
         <canvas 
           ref={canvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"
@@ -643,6 +692,7 @@ const ARMeasureTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [corners, setCorners] = useState<Point3D[]>([]);
@@ -663,7 +713,10 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       startCamera();
     }
     return () => {
-      if (stream) stream.getTracks().forEach(t => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
     };
   }, [showIntro]);
 
@@ -703,6 +756,7 @@ const Scan3DTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }
       
       setStream(s);
+      streamRef.current = s;
     } catch (err) {
       console.error("Error de cámara:", err);
       setError(`Error de cámara: ${err instanceof Error ? err.message : String(err)}`);

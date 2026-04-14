@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, User, CheckCircle2, AlertCircle, AlertTriangle, Send, Trash2, X, Building, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, User, CheckCircle2, AlertCircle, AlertTriangle, Send, Trash2, X, Building, Users, Search } from 'lucide-react';
 import { CalendarTask, User as UserType, UrgencyLevel, AppTab, ExternalUser, Role } from '../types';
 import { storageService } from '../services/storageService';
 import { getLocalDateString, isHoliday } from '../services/dateUtils';
@@ -19,6 +19,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigat
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<CalendarTask | undefined>(undefined);
   const [taskToDelete, setTaskToDelete] = useState<CalendarTask | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isMaster = user.role === 'MASTER';
 
@@ -72,6 +73,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigat
     const dateStr = getLocalDateString(selectedDate);
     return tasks.filter(t => t.startDate === dateStr).sort((a,b) => (a.startTime || '').localeCompare(b.startTime || ''));
   }, [tasks, selectedDate]);
+
+  const filteredSearchTasks = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    return tasks.filter(t => 
+      t.title.toLowerCase().includes(query) || 
+      t.description.toLowerCase().includes(query) ||
+      t.location?.toLowerCase().includes(query) ||
+      t.type.toLowerCase().includes(query)
+    ).sort((a, b) => b.startDate.localeCompare(a.startDate));
+  }, [tasks, searchQuery]);
 
   const techniciansOff = useMemo(() => {
     const dateStr = getLocalDateString(selectedDate);
@@ -135,7 +147,79 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigat
         </div>
       </div>
 
-      {/* Grid del Mes */}
+      {/* Buscador */}
+      <div className="px-2">
+        <div className="relative group">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-yellow-500 transition-colors">
+            <Search className="w-4 h-4" />
+          </div>
+          <input 
+            type="text"
+            placeholder="BUSCAR EN LA AGENDA..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border border-gray-100 rounded-2xl py-4 pl-12 pr-4 text-[10px] font-black uppercase tracking-widest outline-none focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/10 transition-all shadow-sm"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {searchQuery.trim() ? (
+        /* Resultados de Búsqueda */
+        <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+              <Search className="w-3 h-3" />
+              Resultados para "{searchQuery}"
+            </h3>
+            <span className="text-[8px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+              {filteredSearchTasks.length} ENCONTRADOS
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {filteredSearchTasks.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-[2rem] border-2 border-dashed border-gray-100">
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">No se encontraron coincidencias</p>
+              </div>
+            ) : (
+              filteredSearchTasks.map((task, idx) => (
+                <div 
+                  key={`search-${task.id}-${idx}`}
+                  onClick={() => {
+                    setSelectedDate(new Date(task.startDate));
+                    setSearchQuery('');
+                  }}
+                  className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 hover:border-yellow-400 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${getPriorityColor(task.priority)}`}>
+                        <CalendarIcon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-[11px] uppercase text-gray-900 leading-none group-hover:text-yellow-600 transition-colors">{task.title}</h4>
+                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">{task.startDate} · {task.startTime || 'S/N'}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-yellow-500 transition-all" />
+                  </div>
+                  <p className="text-[9px] text-gray-500 font-bold line-clamp-1 uppercase tracking-tight">{task.description}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Grid del Mes */}
       <div className="bg-white rounded-[2.5rem] p-6 border border-gray-100 shadow-sm">
         <div className="grid grid-cols-7 gap-1 mb-4">
           {['L','M','X','J','V','S','D'].map(d => (
@@ -222,9 +306,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigat
               <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Sin trabajos programados</p>
             </div>
           ) : (
-            selectedTasks.map(task => (
+            selectedTasks.map((task, idx) => (
               <div 
-                key={task.id} 
+                key={`${task.id}-${idx}`} 
                 className={`bg-white rounded-[2rem] p-5 shadow-sm border transition-all ${task.status === 'Completada' ? 'border-green-100 opacity-60' : 'border-gray-100'}`}
               >
                 <div className="flex items-center justify-between mb-3">
@@ -294,8 +378,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ user, activeUnit, onNavigat
           )}
         </div>
       </div>
+    </>
+  )}
 
-      {/* Modal Confirmación Borrado */}
+  {/* Modal Confirmación Borrado */}
       {taskToDelete && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
            <div className="w-full max-w-xs bg-white rounded-[2.5rem] p-8 text-center shadow-2xl animate-in zoom-in-95 duration-300">

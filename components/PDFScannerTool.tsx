@@ -22,6 +22,7 @@ const PDFScannerTool: React.FC<PDFScannerToolProps> = ({ onBack }) => {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
@@ -33,24 +34,49 @@ const PDFScannerTool: React.FC<PDFScannerToolProps> = ({ onBack }) => {
     return () => stopCamera();
   }, [step]);
 
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
   const startCamera = async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false 
-      });
-      setStream(s);
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
+      setError(null);
+      
+      if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+        throw new Error("La cámara requiere una conexión segura (HTTPS).");
       }
+
+      const constraints = { 
+        video: { 
+          facingMode: { ideal: 'environment' }, 
+          width: { ideal: 1920 }, 
+          height: { ideal: 1080 } 
+        },
+        audio: false 
+      };
+      
+      let s;
+      try {
+        s = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e) {
+        console.warn("Fallo con ideal, intentando básico", e);
+        s = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      
+      setStream(s);
+      streamRef.current = s;
     } catch (err) {
-      setError("No se pudo acceder a la cámara. Asegúrate de dar permisos.");
+      console.error("Error de cámara:", err);
+      setError(`Error de cámara: ${err instanceof Error ? err.message : "No se pudo acceder a la cámara. Asegúrate de dar permisos."}`);
     }
   };
 
   const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
       setStream(null);
     }
   };

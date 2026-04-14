@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, User as UserIcon, Lock, ChevronLeft, ChevronRight, UserPlus, AlertCircle, Crown, Phone } from 'lucide-react';
 import { Role, User } from '../types';
-import { storageService } from '../services/storageService';
+import { storageService, cleanData } from '../services/storageService';
 
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -90,22 +90,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
       const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
       const firebaseUser = userCredential.user;
 
+      const isMasterAdmin = formData.username.toLowerCase() === 'admin' || formData.username.toLowerCase() === 'jyebavi';
+
       const newUser: User = {
         id: firebaseUser.uid,
         name: formData.name || formData.username, // Use username as fallback name
         username: formData.username,
         password: '', // Don't store plain password in Firestore
-        role: formData.username.toLowerCase() === 'admin' ? 'MASTER' : formData.role,
-        status: formData.username.toLowerCase() === 'admin' ? 'approved' : 'pending',
-        userCategory: formData.username.toLowerCase() === 'admin' ? 'Oficina de Control' : 'Técnico',
+        role: isMasterAdmin ? 'MASTER' : formData.role,
+        status: isMasterAdmin ? 'approved' : 'pending',
+        userCategory: isMasterAdmin ? 'Oficina de Control' : 'Técnico',
         assignedBuildings: [],
-        assignedUnits: formData.username.toLowerCase() === 'admin' ? ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] : [formData.role],
+        assignedUnits: isMasterAdmin ? ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] : [formData.role],
         phone: formData.phone,
         isManto: true,
         leaveDays: []
       };
 
-      await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+      await setDoc(doc(db, 'users', firebaseUser.uid), cleanData(newUser));
       
       // After initial registration, move to complementary data view
       setView('complementary');
@@ -189,7 +191,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
                 setLoading(true);
                 try {
                   const userRef = doc(db, 'users', auth.currentUser!.uid);
-                  await setDoc(userRef, {
+                  await setDoc(userRef, cleanData({
                     name: formData.name,
                     phone: formData.phone,
                     role: formData.role,
@@ -197,7 +199,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
                     assignedUnits: [formData.role],
                     userCategory: 'Técnico',
                     isManto: true
-                  }, { merge: true });
+                  }), { merge: true });
                   setView('pending');
                 } catch (e) {
                   setError('Error al guardar datos complementarios');
@@ -292,30 +294,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ initialRole, initialView = 'login
             >
               {loading ? 'Procesando...' : (view === 'login' ? 'Entrar' : 'Registrarse')} <ChevronRight className="w-4 h-4 text-black" />
             </button>
-
-            {view === 'login' && (
-              <button 
-                type="button"
-                onClick={() => {
-                  const masterUser: User = {
-                    id: 'emergency-admin',
-                    name: 'Admin Emergencia',
-                    username: 'admin',
-                    password: '',
-                    role: 'MASTER',
-                    status: 'approved',
-                    assignedBuildings: [],
-                    assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'],
-                    isManto: true,
-                    leaveDays: []
-                  };
-                  onLogin(masterUser);
-                }}
-                className="w-full p-4 bg-red-50 text-red-600 rounded-2xl font-black uppercase text-[8px] tracking-widest mt-4 border border-red-100 opacity-50 hover:opacity-100 transition-opacity"
-              >
-                ⚠️ Acceso de Emergencia (Sin Firebase)
-              </button>
-            )}
           </form>
         </div>
 

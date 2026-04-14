@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Users, Calendar, CheckCircle, XCircle, ChevronRight, Phone, Mail, Award, Settings2, X, ChevronLeft, Plus, ShieldCheck, Briefcase, FileText, Edit2 } from 'lucide-react';
-import { User, LeaveEntry, LeaveType, Role } from '../types';
+import { User, LeaveEntry, LeaveType, Role, UserCategory } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
 import { db } from '../firebase';
@@ -305,6 +305,7 @@ const CreateTechModal: React.FC<CreateTechModalProps> = ({ activeUnit, onClose, 
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('1234');
+  const [userCategory, setUserCategory] = useState<UserCategory>('Técnico');
 
   const handleCreate = () => {
     if (!name || !username) return alert("Nombre y Usuario son obligatorios");
@@ -318,7 +319,8 @@ const CreateTechModal: React.FC<CreateTechModalProps> = ({ activeUnit, onClose, 
       status: 'approved',
       assignedBuildings: activeUnit === 'USAC' ? BUILDINGS.map(b => b.id) : [],
       assignedUnits: [activeUnit],
-      isManto: true,
+      isManto: userCategory === 'Técnico',
+      userCategory,
       specialty,
       phone,
       leaveDays: []
@@ -347,6 +349,24 @@ const CreateTechModal: React.FC<CreateTechModalProps> = ({ activeUnit, onClose, 
         </div>
 
         <div className="p-8 space-y-4">
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Categoría de Usuario</label>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setUserCategory('Técnico')}
+                className={`flex-1 p-3 rounded-xl text-[10px] font-black uppercase transition-all ${userCategory === 'Técnico' ? 'bg-gray-900 text-yellow-400 shadow-lg' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}
+              >
+                Técnico
+              </button>
+              <button 
+                onClick={() => setUserCategory('Oficina de Control')}
+                className={`flex-1 p-3 rounded-xl text-[10px] font-black uppercase transition-all ${userCategory === 'Oficina de Control' ? 'bg-gray-900 text-yellow-400 shadow-lg' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}
+              >
+                Oficina de Control
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-1">
             <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Nombre Completo</label>
             <input 

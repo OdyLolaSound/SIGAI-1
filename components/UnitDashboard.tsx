@@ -6,8 +6,9 @@ import {
   ChevronRight, ArrowUpRight, ArrowDownRight, AlertCircle,
   TrendingUp, Settings, ShieldAlert, Timer, CheckCircle2,
   Warehouse, FileSpreadsheet, HardHat, Fuel, Globe, Bell,
-  Wrench, X, Clock, CalendarDays
+  Wrench, X, Clock, CalendarDays, ShieldCheck
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { AppTab, User, ServiceType, Building, Role, UrgencyLevel, AppNotification } from '../types';
 import { storageService, BUILDINGS } from '../services/storageService';
 import { getLocalDateString } from '../services/dateUtils';
@@ -27,6 +28,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
   const [snoozeData, setSnoozeData] = useState<{ id: string, date: string } | null>(null);
+  const [showTechList, setShowTechList] = useState(false);
 
   // REAL-TIME NOTIFICATIONS LISTENER
   useEffect(() => {
@@ -54,7 +56,19 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
     return tasks.filter(t => t.startDate === today && t.status !== 'Completada');
   }, [tasks]);
 
-  const requests = useMemo(() => storageService.getRequests().filter(r => isMaster || r.unit === activeUnit), [activeUnit, isMaster]);
+  const requests = useMemo(() => {
+    const all = storageService.getRequests().filter(r => isMaster || r.unit === activeUnit);
+    return all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [activeUnit, isMaster]);
+  
+  const pendingAcceptanceRequests = useMemo(() => {
+    return requests.filter(r => 
+      r.status === 'asignada' && 
+      r.assignedTechnicians?.includes(user.id) &&
+      r.acceptanceStatus?.[user.id] === 'pending'
+    );
+  }, [requests, user.id]);
+
   const team = useMemo(() => storageService.getUsers().filter(u => isMaster || u.assignedUnits?.includes(activeUnit)), [activeUnit, isMaster]);
   const waterReadings = useMemo(() => storageService.getReadings('BASE_ALICANTE', 'agua'), []);
   
@@ -108,6 +122,11 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
     setConfirmCloseId(null);
   };
 
+  const handleAcceptRequest = async (requestId: string) => {
+    await storageService.acceptRequest(requestId, user.id);
+    // Add a notification for the manager? Maybe later.
+  };
+
   const handleSnooze = async () => {
     if (!snoozeData) return;
     
@@ -142,6 +161,38 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
   return (
     <div className="w-full max-w-sm mx-auto space-y-10 pb-12 animate-in fade-in duration-500">
       
+      {/* PENDIENTES DE ACEPTACIÓN (SOLO TÉCNICOS) */}
+      {pendingAcceptanceRequests.length > 0 && (
+        <div className="px-2 space-y-3">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 px-4">Tareas Pendientes de Aceptación</h3>
+          {pendingAcceptanceRequests.map(req => (
+            <div key={req.id} className="bg-blue-600 border-2 border-blue-500 rounded-3xl p-6 flex flex-col gap-4 shadow-xl animate-in slide-in-from-right-4">
+              <div className="flex gap-4">
+                <div className="bg-white p-3 rounded-2xl text-blue-600 h-fit">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-[11px] font-black uppercase text-white">{req.title}</h4>
+                  <p className="text-[9px] font-bold text-blue-100 leading-relaxed uppercase tracking-tight line-clamp-2">
+                    {req.description}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Map className="w-3 h-3 text-blue-200" />
+                    <span className="text-[8px] font-black text-blue-200 uppercase">{req.locationData?.buildingName || 'Ubicación N/D'}</span>
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => handleAcceptRequest(req.id)}
+                className="w-full py-4 bg-white text-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Aceptar Recepción de Trabajo
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* NOTIFICACIONES CRÍTICAS Y TAREAS DE HOY */}
       {(notifications.length > 0 || todayTasks.length > 0) && (
         <div className="px-2 space-y-3">
@@ -169,8 +220,8 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
           )}
 
           {/* Notificaciones Reales */}
-          {notifications.map(n => (
-            <div key={n.id} className="bg-red-50 border-2 border-red-100 rounded-3xl p-5 flex flex-col gap-3 animate-in slide-in-from-top-4 shadow-sm relative overflow-hidden">
+          {notifications.map((n, idx) => (
+            <div key={`${n.id}-${idx}`} className="bg-red-50 border-2 border-red-100 rounded-3xl p-5 flex flex-col gap-3 animate-in slide-in-from-top-4 shadow-sm relative overflow-hidden">
               <div className="flex gap-4">
                 <div className="bg-red-500 p-3 rounded-2xl text-white h-fit">
                   <ShieldAlert className="w-5 h-5" />
@@ -330,6 +381,53 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
         </div>
       </section>
 
+      {/* SECCIÓN: MIS PETICIONES (SOLO PARA UNIDADES QUE NO SON USAC O MASTER) */}
+      {isRestricted && (
+        <section className="space-y-4 px-2">
+          <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-blue-500" /> Mis Peticiones
+          </h3>
+          <div className="space-y-3">
+            {requests.length === 0 ? (
+              <div className="p-10 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100">
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No has realizado peticiones aún</p>
+              </div>
+            ) : (
+              requests.map(req => (
+                <div key={req.id} className="bg-white border border-gray-100 rounded-[2rem] p-5 shadow-sm">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${req.type === 'peticion' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                        {req.type === 'peticion' ? <Wrench className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black text-gray-900 uppercase leading-none mb-1">{req.title}</div>
+                        <div className="text-[8px] font-bold text-gray-400 uppercase">Nº: {req.id.split('-')[0]}</div>
+                      </div>
+                    </div>
+                    <div className={`px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-widest ${
+                      req.status === 'closed' ? 'bg-green-100 text-green-600' : 
+                      req.status === 'in_progress' ? 'bg-blue-100 text-blue-600' : 
+                      req.status === 'asignada' ? 'bg-amber-100 text-amber-600' : 
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {req.status === 'open' ? 'Abierta' : 
+                       req.status === 'in_progress' ? 'En Curso' : 
+                       req.status === 'asignada' ? 'Asignada' : 
+                       req.status === 'closed' ? 'Resuelta' : 'Pendiente'}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[8px] font-bold text-gray-400 uppercase">
+                    <span>{new Date(req.date).toLocaleDateString()}</span>
+                    <span>{req.category}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      )}
+
       {!isRestricted && !isTecnico && (
         <>
           {/* SECCIÓN 2: CONSUMOS Y SUMINISTROS */}
@@ -396,31 +494,49 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
                     </button>
                  </div>
 
-                 {techniciansStatus.length > 0 && (
-                   <div className="mb-6 space-y-3">
-                     <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-2">Estado del Equipo Hoy</div>
-                     <div className="grid grid-cols-1 gap-2">
-                       {techniciansStatus.map((tech) => (
-                         <div key={tech.id} className="flex justify-between items-center p-2 rounded-xl bg-gray-50/50 border border-gray-100/50">
-                           <div className="flex items-center gap-2">
-                             <div className={`w-2 h-2 rounded-full ${tech.isActive ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`} />
-                             <span className="text-[10px] font-black text-gray-900 uppercase truncate max-w-[120px]">{tech.name}</span>
-                           </div>
-                           <div className="flex items-center gap-2">
-                             {!tech.isActive && (
-                               <span className="text-[7px] font-black text-red-600 bg-red-100 px-2 py-0.5 rounded-lg uppercase tracking-tighter">
-                                 {tech.leaveType || 'Libre'}
-                               </span>
-                             )}
-                             <span className={`text-[7px] font-black uppercase tracking-widest ${tech.isActive ? 'text-green-600' : 'text-red-400'}`}>
-                               {tech.isActive ? 'Disponible' : 'No Disponible'}
-                             </span>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
-                 )}
+                  {techniciansStatus.length > 0 && (
+                    <div className="mb-6 space-y-3">
+                      <button 
+                        onClick={() => setShowTechList(!showTechList)}
+                        className="w-full flex justify-between items-center text-[8px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-2 hover:text-gray-900 transition-colors"
+                      >
+                        <span>Estado del Equipo Hoy</span>
+                        <ChevronRight className={`w-3 h-3 transition-transform duration-300 ${showTechList ? 'rotate-90' : ''}`} />
+                      </button>
+                      
+                      <AnimatePresence>
+                        {showTechList && (
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="grid grid-cols-1 gap-2 pt-2">
+                              {techniciansStatus.map((tech, idx) => (
+                                <div key={`${tech.id}-${idx}`} className="flex justify-between items-center p-2 rounded-xl bg-gray-50/50 border border-gray-100/50">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${tech.isActive ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`} />
+                                    <span className="text-[10px] font-black text-gray-900 uppercase truncate max-w-[120px]">{tech.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {!tech.isActive && (
+                                      <span className="text-[7px] font-black text-red-600 bg-red-100 px-2 py-0.5 rounded-lg uppercase tracking-tighter">
+                                        {tech.leaveType || 'Libre'}
+                                      </span>
+                                    )}
+                                    <span className={`text-[7px] font-black uppercase tracking-widest ${tech.isActive ? 'text-green-600' : 'text-red-400'}`}>
+                                      {tech.isActive ? 'Disponible' : 'No Disponible'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
                  
                  <div className="grid grid-cols-3 gap-3">
                     <StatusBox label="Urgente" val={urgentRequests} color="text-red-600 bg-red-50" />
@@ -445,6 +561,31 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ user, activeUnit, onNavig
               >
                 <ClipboardList className="w-5 h-5" /> Panel Gestión de Prioridades
               </button>
+
+              {/* SECCIÓN: SEGURIDAD E INSPECCIONES (OCA) */}
+              {user.role === 'MASTER' && (
+                <section className="space-y-4">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-red-500" /> Seguridad e Inspecciones
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <ActionButton 
+                      icon={<ShieldCheck className="w-6 h-6" />}
+                      title="Certificados OCA"
+                      desc="Inspecciones reglamentarias"
+                      onClick={() => onNavigate(AppTab.OCA)}
+                      color="bg-red-50 border-red-100 text-red-900"
+                    />
+                    <ActionButton 
+                      icon={<FileText className="w-6 h-6" />}
+                      title="Sectoriales (PPT)"
+                      desc="Pliegos y mantenimientos"
+                      onClick={() => onNavigate(AppTab.PPTS)}
+                      color="bg-gray-50 border-gray-100 text-gray-900"
+                    />
+                  </div>
+                </section>
+              )}
 
               {/* SECCIÓN: HERRAMIENTAS DE TRABAJO (SOLO USAC Y MASTER) */}
               {(user.role === 'USAC' || user.role === 'MASTER') && (

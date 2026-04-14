@@ -2,12 +2,12 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import admin from "firebase-admin";
-import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, query, where, orderBy, limit, writeBatch } from 'firebase/firestore';
 
 // Load Firebase configuration
 const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
-let firebaseConfig: any = { projectId: 'placeholder' };
+let firebaseConfig: any = {};
 
 if (fs.existsSync(firebaseConfigPath)) {
   try {
@@ -17,28 +17,19 @@ if (fs.existsSync(firebaseConfigPath)) {
   }
 }
 
-import { WATER_HISTORY } from './src/services/waterHistoryData.js';
+import { WATER_HISTORY } from './src/services/waterHistoryData';
 
-// Initialize Firebase Admin SDK
-// Using Admin SDK on the server avoids the "Listen stream" timeout issues of the Client SDK
-let adminApp: admin.app.App;
-if (admin.apps.length === 0) {
-  adminApp = admin.initializeApp({
-    projectId: firebaseConfig.projectId
-  });
-} else {
-  adminApp = admin.app();
-}
+// Initialize Firebase Client SDK
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-const db = getFirestore(adminApp, dbId);
-
-console.log(`Firebase Admin initialized for project: ${firebaseConfig.projectId}, database: ${dbId}`);
+console.log(`Firebase Client SDK initialized for project: ${firebaseConfig.projectId}, database: ${firebaseConfig.firestoreDatabaseId}`);
 
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
 const DEFAULT_USERS = [
-  { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] }
+  { id: 'master-1', name: 'Master Admin', username: 'master@picks.pro', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] },
+  { id: 'master-jyebavi', name: 'Jyebavi', username: 'jyebavi', password: '123', role: 'MASTER', status: 'approved', assignedBuildings: [], assignedUnits: ['USAC', 'CG', 'GCG', 'GOE3', 'GOE4', 'BOEL', 'UMOE', 'CECOM'] }
 ];
 
 // Helper to read/write data
@@ -83,19 +74,20 @@ const writeData = (data: any) => {
 
 async function importHistoricalData() {
   try {
-    const readingsRef = db.collection('readings');
-    const snapshot = await readingsRef
-      .where('serviceType', '==', 'agua')
-      .where('buildingId', '==', 'BASE_ALICANTE')
-      .limit(1)
-      .get();
+    const readingsRef = collection(db, 'readings');
+    const q = query(readingsRef, 
+      where('serviceType', '==', 'agua'),
+      where('buildingId', '==', 'BASE_ALICANTE'),
+      limit(1)
+    );
+    const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
       console.log("Importing historical water data...");
-      const batch = db.batch();
+      const batch = writeBatch(db);
       for (const entry of WATER_HISTORY) {
         const readingId = `water-hist-${entry.date}`;
-        const docRef = readingsRef.doc(readingId);
+        const docRef = doc(readingsRef, readingId);
         batch.set(docRef, {
           id: readingId,
           buildingId: 'BASE_ALICANTE',
@@ -114,11 +106,11 @@ async function importHistoricalData() {
     }
 
     // Ensure a default water account exists
-    const accountsRef = db.collection('water_accounts');
-    const accountsSnapshot = await accountsRef.limit(1).get();
+    const accountsRef = collection(db, 'water_accounts');
+    const accountsSnapshot = await getDocs(query(accountsRef, limit(1)));
     if (accountsSnapshot.empty) {
       console.log("Creating default water account...");
-      await accountsRef.doc('main-water-account').set({
+      await setDoc(doc(accountsRef, 'main-water-account'), {
         id: 'main-water-account',
         name: 'Contador General Base Alicante',
         buildingId: 'BASE_ALICANTE',
@@ -128,7 +120,7 @@ async function importHistoricalData() {
         peakThresholdPercent: 50,
         selectors: {
           userField: '#username',
-          passField: '#password',
+          passwordField: '#password',
           submitBtn: '#login-btn',
           tableRow: '.consumption-row'
         }
@@ -136,8 +128,8 @@ async function importHistoricalData() {
     }
 
     // Seed Boilers if empty
-    const boilersRef = db.collection('boilers');
-    const boilersSnapshot = await boilersRef.limit(1).get();
+    const boilersRef = collection(db, 'boilers');
+    const boilersSnapshot = await getDocs(query(boilersRef, limit(1)));
     if (boilersSnapshot.empty) {
       console.log("Seeding default boilers...");
       const defaultBoilers = [
@@ -167,13 +159,13 @@ async function importHistoricalData() {
         }
       ];
       for (const b of defaultBoilers) {
-        await boilersRef.doc(b.id).set(b);
+        await setDoc(doc(boilersRef, b.id), b);
       }
     }
 
     // Seed Gasoil Tanks if empty
-    const tanksRef = db.collection('gasoil_tanks');
-    const tanksSnapshot = await tanksRef.limit(1).get();
+    const tanksRef = collection(db, 'gasoil_tanks');
+    const tanksSnapshot = await getDocs(query(tanksRef, limit(1)));
     if (tanksSnapshot.empty) {
       console.log("Seeding default gasoil tanks...");
       const defaultTanks = [
@@ -191,16 +183,16 @@ async function importHistoricalData() {
         }
       ];
       for (const t of defaultTanks) {
-        await tanksRef.doc(t.id).set(t);
+        await setDoc(doc(tanksRef, t.id), t);
       }
     }
     
     // Seed Salt Stock if empty
-    const saltRef = db.collection('salt_stock').doc('current');
-    const saltDoc = await saltRef.get();
-    if (!saltDoc.exists) {
+    const saltRef = doc(db, 'salt_stock', 'current');
+    const saltDoc = await getDoc(saltRef);
+    if (!saltDoc.exists()) {
       console.log("Seeding default salt stock...");
-      await saltRef.set({
+      await setDoc(saltRef, {
         sacksAvailable: 45,
         kgPerSack: 25,
         minAlertLevel: 20,
@@ -208,6 +200,61 @@ async function importHistoricalData() {
         status: 'normal',
         lastSupplier: 'Salinas de Torrevieja'
       });
+    }
+
+    // Seed Providers if empty
+    const providersRef = collection(db, 'providers');
+    const providersSnapshot = await getDocs(query(providersRef, limit(1)));
+    if (providersSnapshot.empty) {
+      console.log("Seeding default providers...");
+      const defaultProviders = [
+        {
+          id: 'prov-1',
+          name: 'Suministros Industriales Levante',
+          cif: 'A03123456',
+          phone: '965123456',
+          email: 'ventas@suministroslevante.com',
+          categories: ['ferreteria', 'fontaneria'],
+          address: 'Polígono Industrial Las Atalayas, Alicante'
+        },
+        {
+          id: 'prov-2',
+          name: 'Electricidad Rabasa',
+          cif: 'B03987654',
+          phone: '965987654',
+          email: 'info@electricidadrabasa.es',
+          categories: ['electricidad'],
+          address: 'Calle Mayor 45, San Vicente del Raspeig'
+        }
+      ];
+      for (const p of defaultProviders) {
+        await setDoc(doc(providersRef, p.id), p);
+      }
+    }
+
+    // Seed Categories if empty
+    const categoriesRef = collection(db, 'categories');
+    const categoriesSnapshot = await getDocs(query(categoriesRef, limit(1)));
+    if (categoriesSnapshot.empty) {
+      console.log("Seeding default categories...");
+      const defaultCategories = [
+        { id: 'ferreteria', name: 'Ferretería', icon: 'Hammer' },
+        { id: 'fontaneria', name: 'Fontanería', icon: 'Droplets' },
+        { id: 'electricidad', name: 'Electricidad', icon: 'Zap' },
+        { id: 'climatizacion', name: 'Climatización', icon: 'Thermometer' },
+        { id: 'pintura', name: 'Pintura', icon: 'Paintbrush' },
+        { id: 'limpieza', name: 'Limpieza', icon: 'Trash2' },
+        { id: 'jardineria', name: 'Jardinería', icon: 'Leaf' },
+        { id: 'oficina', name: 'Oficina', icon: 'Briefcase' },
+        { id: 'seguridad', name: 'Seguridad', icon: 'Shield' },
+        { id: 'construccion', name: 'Construcción', icon: 'HardHat' },
+        { id: 'carpinteria', name: 'Carpintería', icon: 'Box' },
+        { id: 'informatica', name: 'Informática', icon: 'Monitor' },
+        { id: 'otros', name: 'Otros', icon: 'MoreHorizontal' }
+      ];
+      for (const c of defaultCategories) {
+        await setDoc(doc(categoriesRef, c.id), c);
+      }
     }
   } catch (error) {
     console.error("Error importing historical data:", error);
@@ -224,13 +271,14 @@ async function automateWaterSync() {
     if (hours === 0 && minutes < 5) {
       console.log("Starting automated water sync at 00:00...");
       
-      const readingsRef = db.collection('readings');
-      const snapshot = await readingsRef
-        .where('serviceType', '==', 'agua')
-        .where('buildingId', '==', 'BASE_ALICANTE')
-        .orderBy('date', 'desc')
-        .limit(1)
-        .get();
+      const readingsRef = collection(db, 'readings');
+      const q = query(readingsRef, 
+        where('serviceType', '==', 'agua'),
+        where('buildingId', '==', 'BASE_ALICANTE'),
+        orderBy('date', 'desc'),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
       
       if (!snapshot.empty) {
         const lastReading = snapshot.docs[0].data();
@@ -258,11 +306,11 @@ async function automateWaterSync() {
             isPeak: consumption > 150
           };
 
-          await readingsRef.doc(readingId).set(newReading);
+          await setDoc(doc(readingsRef, readingId), newReading);
           console.log(`Automated water reading saved: ${newValue} m3 (+${consumption})`);
 
           if (consumption > 150) {
-            await db.collection('notifications').add({
+            await addDoc(collection(db, 'notifications'), {
               id: crypto.randomUUID(),
               userId: 'all',
               title: 'ALERTA: Consumo de Agua Elevado',
@@ -289,11 +337,11 @@ async function automateGasoilTelemetry() {
     // Simulate sensor update every 4 hours
     if (hours % 4 === 0 && minutes < 5) {
       console.log("Updating Gasoil telemetry sensors...");
-      const tanksRef = db.collection('gasoil_tanks');
-      const snapshot = await tanksRef.get();
+      const tanksRef = collection(db, 'gasoil_tanks');
+      const snapshot = await getDocs(tanksRef);
 
-      for (const doc of snapshot.docs) {
-        const tank = doc.data();
+      for (const docSnapshot of snapshot.docs) {
+        const tank = docSnapshot.data();
         // Simulate a small daily consumption (0.1% to 0.5% every 4 hours)
         const consumptionPercent = (Math.random() * 0.4 + 0.1);
         const newLevel = Math.max(0, tank.currentLevel - consumptionPercent);
@@ -304,7 +352,7 @@ async function automateGasoilTelemetry() {
         else if (newLevel < 25) alertStatus = 'bajo';
         else if (newLevel < 40) alertStatus = 'atencion';
 
-        await tanksRef.doc(doc.id).update({
+        await updateDoc(docSnapshot.ref, {
           currentLevel: Number(newLevel.toFixed(2)),
           currentLitres: Math.round(newLitres),
           lastReading: now.toISOString(),
@@ -312,9 +360,9 @@ async function automateGasoilTelemetry() {
         });
 
         // Add to readings history
-        await db.collection('gasoil_readings').add({
+        await addDoc(collection(db, 'gasoil_readings'), {
           id: crypto.randomUUID(),
-          tankId: doc.id,
+          tankId: docSnapshot.id,
           date: now.toISOString(),
           percentage: Number(newLevel.toFixed(2)),
           litres: Math.round(newLitres),
@@ -323,7 +371,7 @@ async function automateGasoilTelemetry() {
         });
 
         if (alertStatus === 'critico' || alertStatus === 'bajo') {
-          await db.collection('notifications').add({
+          await addDoc(collection(db, 'notifications'), {
             id: crypto.randomUUID(),
             userId: 'all',
             title: `Nivel Bajo: ${tank.fullName}`,
@@ -348,11 +396,18 @@ async function automateBoilerTelemetry() {
     // Update every 30 minutes
     if (minutes % 30 < 5) {
       console.log("Updating Boiler IoT sensors...");
-      const boilersRef = db.collection('boilers');
-      const snapshot = await boilersRef.get();
+      const boilersRef = collection(db, 'boilers');
+      
+      let snapshot;
+      try {
+        snapshot = await getDocs(boilersRef);
+      } catch (e: any) {
+        console.error("Error fetching boilers for telemetry:", e.message);
+        return;
+      }
 
-      for (const doc of snapshot.docs) {
-        const boiler = doc.data();
+      for (const docSnapshot of snapshot.docs) {
+        const boiler = docSnapshot.data();
         if (boiler.status === 'averiada' || boiler.status === 'fuera_servicio') continue;
 
         // Simulate normal operating ranges
@@ -364,9 +419,9 @@ async function automateBoilerTelemetry() {
         if (pressure > boiler.refTemps.pressureMax) alerts.push('SOBREPRESIÓN');
         if (pressure < boiler.refTemps.pressureMin) alerts.push('BAJA PRESIÓN');
 
-        await db.collection('boiler_readings').add({
+        await addDoc(collection(db, 'boiler_readings'), {
           id: crypto.randomUUID(),
-          boilerId: doc.id,
+          boilerId: docSnapshot.id,
           date: now.toISOString(),
           tempImpulsion: Number(tempImpulsion.toFixed(1)),
           tempRetorno: Number(tempRetorno.toFixed(1)),
@@ -378,7 +433,7 @@ async function automateBoilerTelemetry() {
         });
 
         if (alerts.length > 0) {
-          await db.collection('notifications').add({
+          await addDoc(collection(db, 'notifications'), {
             id: crypto.randomUUID(),
             userId: 'all',
             title: `Alarma Caldera: ${boiler.code}`,
@@ -404,11 +459,11 @@ async function automateSaltInventory() {
     // Run once a day at 01:00
     if (hours === 1 && minutes < 5) {
       console.log("Updating Salt inventory levels...");
-      const stockRef = db.collection('salt_stock').doc('current');
-      const doc = await stockRef.get();
+      const stockRef = doc(db, 'salt_stock', 'current');
+      const docSnapshot = await getDoc(stockRef);
       
-      if (doc.exists) {
-        const stock = doc.data();
+      if (docSnapshot.exists()) {
+        const stock = docSnapshot.data();
         // Simulate consumption: 0.5 to 1.5 sacks per day
         const consumption = 0.5 + Math.random();
         const newSacks = Math.max(0, stock.sacksAvailable - consumption);
@@ -417,13 +472,13 @@ async function automateSaltInventory() {
         if (newSacks < stock.criticalAlertLevel) status = 'critico';
         else if (newSacks < stock.minAlertLevel) status = 'bajo';
 
-        await stockRef.update({
+        await updateDoc(stockRef, {
           sacksAvailable: Number(newSacks.toFixed(1)),
           status
         });
 
         if (status === 'critico' || status === 'bajo') {
-          await db.collection('notifications').add({
+          await addDoc(collection(db, 'notifications'), {
             id: crypto.randomUUID(),
             userId: 'all',
             title: 'Stock de Sal Bajo',

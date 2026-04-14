@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Camera, Upload, Send, Loader2, CheckCircle2, AlertCircle, ChevronRight, X, ShieldAlert, Wrench, ArrowLeft, Bot, User as UserIcon, MapPin, Building2, Navigation, Maximize2, Minimize2 } from 'lucide-react';
+import { MessageSquare, Camera, Upload, Send, Loader2, CheckCircle2, AlertCircle, ChevronRight, X, ShieldAlert, Wrench, ArrowLeft, Bot, User as UserIcon, MapPin, Building2, Navigation, Maximize2, Minimize2, FileText } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from 'react-markdown';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
@@ -26,6 +26,8 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
   const [description, setDescription] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isDocumentMode, setIsDocumentMode] = useState(false);
+  const [documentImage, setDocumentImage] = useState<string | null>(null);
   
   // AI Results
   const [aiAnalysis, setAiAnalysis] = useState<{
@@ -49,6 +51,7 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
   const [markerPos, setMarkerPos] = useState<{ lat: number, lng: number } | null>(null);
   const [specificLocation, setSpecificLocation] = useState('');
   const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [buildingSearch, setBuildingSearch] = useState('');
 
   // Leaflet Marker Icon Fix
   const customIcon = L.icon({
@@ -184,8 +187,80 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setImages(prev => [...prev, reader.result as string]);
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        if (isDocumentMode) {
+          setDocumentImage(result);
+        } else {
+          setImages(prev => [...prev, result]);
+        }
+      };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const startDocumentAnalysis = async () => {
+    if (!documentImage) return alert("Por favor, sube una foto del parte.");
+    
+    setStep('ANALYZING');
+    setLoading(true);
+
+    try {
+      const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: { parts: [
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: documentImage.split(',')[1]
+            }
+          },
+          { text: `Analiza este documento de parte de avería. 
+          Extrae la descripción de la deficiencia, la ubicación mencionada y clasifica la incidencia.
+          
+          Devuelve JSON con:
+          - category: (Eléctrico, Fontanería, Calderas / Climatización, Carpintería / Cerraduras, Mobiliario, Informática, Otros)
+          - urgency: (Baja, Media, Alta, Crítica)
+          - explanation: Resumen de lo que dice el parte
+          - description: Texto completo de la deficiencia extraída
+          - location: Ubicación mencionada en el papel
+          - steps: Pasos sugeridos para el técnico
+          - isChronic: false` }
+        ]},
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              category: { type: Type.STRING },
+              urgency: { type: Type.STRING },
+              explanation: { type: Type.STRING },
+              description: { type: Type.STRING },
+              location: { type: Type.STRING },
+              steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+              isChronic: { type: Type.BOOLEAN }
+            },
+            required: ["category", "urgency", "explanation", "description", "location", "steps", "isChronic"]
+          }
+        }
+      });
+
+      const result = JSON.parse(response.text);
+      setAiAnalysis(result);
+      setDescription(result.description);
+      setSpecificLocation(result.location);
+      setImages([documentImage]); // Use the document as the first image
+      setStep('AI_SUGGESTION');
+    } catch (error) {
+      console.error("Document AI Error:", error);
+      alert("Error al analizar el documento. Por favor, descríbelo manualmente.");
+      setStep('INPUT');
+      setIsDocumentMode(false);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -274,13 +349,13 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
       status: resolvedByAi ? 'resolved_by_ai' : 'open',
       date: new Date().toISOString(),
       imageUrl: images.length > 0 ? images[0] : undefined,
-      aiExplanation: aiAnalysis?.explanation,
-      aiSteps: aiAnalysis?.steps,
-      isChronic: aiAnalysis?.isChronic,
-      structuralSolution: aiAnalysis?.structuralSolution,
+      aiExplanation: aiAnalysis?.explanation || undefined,
+      aiSteps: aiAnalysis?.steps || undefined,
+      isChronic: aiAnalysis?.isChronic ?? false,
+      structuralSolution: aiAnalysis?.structuralSolution || undefined,
       locationData: {
-        buildingId: selectedBuilding?.id,
-        buildingName: selectedBuilding?.name,
+        buildingId: selectedBuilding?.id || undefined,
+        buildingName: selectedBuilding?.name || undefined,
         coordinates: markerPos || undefined,
         specificLocation: specificLocation || undefined
       }
@@ -316,31 +391,104 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
         <div className="w-full max-w-2xl">
           {step === 'INPUT' && (
             <div className="space-y-6 animate-in slide-in-from-bottom-5">
-              <div className="bg-gray-50 border border-gray-100 p-6 rounded-[2.5rem] space-y-4">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">¿Cuál es el problema?</label>
-                <textarea 
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Ej: Hay una fuga de agua en el baño del bloque A..."
-                  className="w-full bg-transparent text-gray-900 text-lg font-bold outline-none resize-none h-32 placeholder:text-gray-300"
-                />
-              </div>
+              {!isDocumentMode ? (
+                <>
+                  <div className="bg-gray-50 border border-gray-100 p-6 rounded-[2.5rem] space-y-4">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">¿Cuál es el problema?</label>
+                    <textarea 
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Ej: Hay una fuga de agua en el baño del bloque A..."
+                      className="w-full bg-transparent text-gray-900 text-lg font-bold outline-none resize-none h-32 placeholder:text-gray-300"
+                    />
+                  </div>
 
-              <div className="space-y-3">
-                <button 
-                  onClick={startAIAnalysis}
-                  className="w-full p-6 bg-yellow-400 text-black rounded-[2.5rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-all"
-                >
-                  Analizar con IA <ChevronRight className="w-5 h-5" />
-                </button>
-                
-                <button 
-                  onClick={onClose}
-                  className="w-full p-4 text-gray-400 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:text-gray-900 transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" /> Cancelar y Volver
-                </button>
-              </div>
+                  <div className="space-y-3">
+                    <button 
+                      onClick={startAIAnalysis}
+                      className="w-full p-6 bg-yellow-400 text-black rounded-[2.5rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-all"
+                    >
+                      Analizar con IA <ChevronRight className="w-5 h-5" />
+                    </button>
+
+                    <button 
+                      onClick={() => setIsDocumentMode(true)}
+                      className="w-full p-6 bg-white border-2 border-gray-900 text-gray-900 rounded-[2.5rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all"
+                    >
+                      <FileText className="w-5 h-5" /> Ya tengo un parte (Subir foto)
+                    </button>
+                    
+                    <button 
+                      onClick={onClose}
+                      className="w-full p-4 text-gray-400 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:text-gray-900 transition-colors"
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Cancelar y Volver
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-8">
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
+                      <FileText className="w-10 h-10" />
+                    </div>
+                    <h3 className="text-gray-900 text-2xl font-black uppercase tracking-tight">Escanear Parte</h3>
+                    <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-2">Sube una foto del parte físico para que la IA lo procese</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => cameraInputRef.current?.click()}
+                      className={`aspect-square rounded-[2.5rem] flex flex-col items-center justify-center gap-3 transition-all group shadow-sm border-2 ${documentImage ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white border-gray-100 text-gray-900 hover:border-yellow-400'}`}
+                    >
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform ${documentImage ? 'bg-green-100' : 'bg-yellow-50 text-yellow-600'}`}>
+                        <Camera className="w-7 h-7" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{documentImage ? 'Cambiar Foto' : 'Hacer Foto'}</span>
+                    </button>
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`aspect-square rounded-[2.5rem] flex flex-col items-center justify-center gap-3 transition-all group shadow-sm border-2 ${documentImage ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white border-gray-100 text-gray-900 hover:border-blue-400'}`}
+                    >
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform ${documentImage ? 'bg-green-100' : 'bg-blue-50 text-blue-600'}`}>
+                        <Upload className="w-7 h-7" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{documentImage ? 'Cambiar Archivo' : 'Subir Archivo'}</span>
+                    </button>
+                  </div>
+
+                  {documentImage && (
+                    <div className="rounded-[2rem] overflow-hidden border-4 border-white shadow-xl aspect-[3/4] bg-gray-100 relative group">
+                      <img src={documentImage} className="w-full h-full object-cover" />
+                      <button 
+                        onClick={() => setDocumentImage(null)}
+                        className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <button 
+                      onClick={startDocumentAnalysis}
+                      disabled={!documentImage}
+                      className="w-full p-6 bg-yellow-400 text-black rounded-[2.5rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                    >
+                      Procesar Parte con IA <ChevronRight className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setIsDocumentMode(false);
+                        setDocumentImage(null);
+                      }}
+                      className="w-full p-4 text-gray-400 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Volver a escribir
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -662,22 +810,63 @@ const AIRequestFlow: React.FC<AIRequestFlowProps> = ({ user, onClose, onComplete
                   {locationType === 'building' ? (
                     <div className="space-y-4">
                       <div className="bg-gray-50 border border-gray-100 rounded-[2rem] p-4">
+                        <div className="mb-4 px-2">
+                          <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Buscar edificio:</label>
+                          <div className="relative">
+                            <input 
+                              type="text"
+                              value={buildingSearch}
+                              onChange={(e) => setBuildingSearch(e.target.value)}
+                              placeholder="Escribe el nombre del edificio..."
+                              className="w-full bg-white border border-gray-200 p-3 rounded-xl text-xs font-bold outline-none focus:border-yellow-400 transition-all"
+                            />
+                            {buildingSearch && (
+                              <button 
+                                onClick={() => setBuildingSearch('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-3 px-2">Selecciona el edificio:</label>
                         <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2">
-                          {BUILDINGS.map(b => (
+                          {BUILDINGS
+                            .filter(b => {
+                              const search = buildingSearch.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                              const name = b.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                              const code = b.code.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                              return name.includes(search) || code.includes(search);
+                            })
+                            .map(b => (
                             <button
                               key={b.id}
                               onClick={() => setSelectedBuilding(b)}
                               className={`p-4 rounded-2xl text-left transition-all flex items-center justify-between ${
                                 selectedBuilding?.id === b.id 
-                                  ? 'bg-yellow-400 text-black shadow-lg' 
+                                  ? 'bg-yellow-400 text-black shadow-lg ring-2 ring-yellow-400 ring-offset-2' 
                                   : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-100'
                               }`}
                             >
-                              <span className="text-[11px] font-black uppercase">{b.name}</span>
+                              <div className="flex flex-col">
+                                <span className="text-[11px] font-black uppercase">{b.name}</span>
+                                <span className="text-[8px] font-bold text-gray-400 uppercase">{b.code}</span>
+                              </div>
                               {selectedBuilding?.id === b.id && <CheckCircle2 className="w-4 h-4" />}
                             </button>
                           ))}
+                          {BUILDINGS.filter(b => {
+                              const search = buildingSearch.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                              const name = b.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                              const code = b.code.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                              return name.includes(search) || code.includes(search);
+                            }).length === 0 && (
+                            <div className="p-8 text-center">
+                              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">No se encontraron edificios</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
